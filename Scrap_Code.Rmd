@@ -1,0 +1,59 @@
+
+```{r}
+test<- c("59:27.10", "58:51.36", "1:26:31.57")
+test<- gsub("\\..*", "", test) #remove milliseconds 
+lapply(strsplit(test,":"),
+  function(x) {
+    x <- as.numeric(x)
+    if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+    else {x[2]+x[3]/60 + 60} 
+    }
+)
+  
+test2 <- lapply(dipsea2019[7], function(x) { x= gsub("\\..*", "", x)}) #remove milliseconds
+#dipseaTEST<- gsub("\\..*", "", dipsea2019[7]) #remove milliseconds 
+splt<- lapply(test2, function(x) {x = strsplit(x,":")})
+
+num<- lapply(splt, function(x) {x = as.numeric(x)})
+
+
+new<- lapply(splt,
+  function(x) {
+    x <- as.numeric(x)
+    if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+    else {x[2]+x[3]/60 + 60} 
+    }
+)
+```
+
+```{r}
+files <- list.files(pattern = "*.xlsx") #get list of files
+test.data <- lapply(files, read_excel) #read in files using lapply
+two.data <- do.call('rbind',data.to.bind)#bind all files
+
+
+library(readxl)    
+read_excel_allsheetsF <- function(filename, tibble = FALSE) {
+    # I prefer straight data.frames
+    # but if you like tidyverse tibbles (the default with read_excel)
+    # then just pass tibble = TRUE
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    if(!tibble) x <- lapply(x, as.data.frame)
+    names(x) <- sheets
+    x
+}
+
+read_excel_allsheetsT <- function(filename, tibble = T) {
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    names(x) <- sheets
+    x
+}
+
+```
+
+
+
+
+

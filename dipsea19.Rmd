@@ -1,0 +1,108 @@
+---
+title: "Dipsea Race"
+author: "Rebecca Silva"
+date: "June 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r} 
+#packages
+library("readxl")
+library("tidyr")
+library("readr")
+library("stringr")
+library("dplyr")
+```
+
+```{r}
+#read data
+dipsea19_raw <- read_excel("Dipsea19.xlsx")
+#View(dipsea19_raw)
+```
+
+###Tidy Data
+```{r}
+names(dipsea19_raw) <- gsub(" ", "_", names(dipsea19_raw))
+
+#split up cols
+dipsea2019 <- dipsea19_raw %>% 
+  separate("Section_/_Place_In_Section", c("Section", "Place_In_Section"), " / ") %>%
+  separate("Group_/_Head_Start", c("Group", "Head_Start"), " / ") %>%
+  separate("Actual_Time_/_Place_(time-based)", c("Actual_Time", "Place_(time-based)"), " / ") 
+
+#make place numeric 
+dipsea2019$Place_Overall<- dipsea2019$Place_Overall %>% str_match_all("[0-9]+") %>%
+  as.numeric
+
+#make time numeric
+dipsea2019$Head_Start<- as.numeric(dipsea2019$Head_Start)
+
+time<- gsub("\\..*", "", dipsea2019$Actual_Time) #remove milliseconds 
+dipsea2019$Actual_Time<- sapply(strsplit(time,":"), #convert char time to mins
+  function(x) {
+    x <- as.numeric(x)
+    if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+    else {x[2]+x[3]/60 + 60} 
+    }
+)
+
+dipsea2019<- dipsea2019%>%
+  select("Place_Overall","Sex", "Age","Section", "Group", "Head_Start", "Actual_Time", "Place_(time-based)") %>% 
+  mutate(Time = Actual_Time - Head_Start, Year = deparse(substitute(dipsea2019)))  
+
+dipsea2019$Year <- gsub("dipsea", "", dipsea2019$Year) %>% as.numeric 
+
+
+```
+
+```{r}
+#make funciton that does above to all years 
+
+read_data <- function(excelname){
+  ds_raw <- read_excel("excelname")
+}
+make_tidy<- function(ds){ #ds should be dipsea + YEAr
+  names(ds) <- gsub(" ", "_", names(ds))
+
+#split up cols
+  ds <- ds %>% 
+    separate("Section_/_Place_In_Section", c("Section", "Place_In_Section"), " / ") %>%
+    separate("Group_/_Head_Start", c("Group", "Head_Start"), " / ") %>%
+    separate("Actual_Time_/_Place_(time-based)", c("Actual_Time", "Place_(time-based)"), " / ") 
+#make place numeric 
+  ds$Place_Overall<- ds$Place_Overall %>% str_match_all("[0-9]+") %>%
+    as.numeric
+#make time cols numeric
+  ds$Head_Start<- as.numeric(ds$Head_Start)
+
+  time<- gsub("\\..*", "", ds$Actual_Time) #remove milliseconds 
+  ds$Actual_Time<- sapply(strsplit(time,":"), #convert char time to mins
+    function(x) {
+      x <- as.numeric(x)
+      if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+      else {x[2]+x[3]/60 + 60} 
+     }
+  )
+  ds <- ds%>%
+    select("Place_Overall","Sex", "Age","Section", "Group", "Head_Start", "Actual_Time", "Place_(time-based)") %>% 
+    mutate(Time = Actual_Time - Head_Start, Year = deparse(substitute(ds)))  
+  ds$Year <- gsub("dipsea", "", ds$Year) %>% as.numeric 
+}
+```
+
+```{r}
+#create loops that reads throughall years and tidys all years 
+
+#library(gdata) --- for xlxs use 
+files <- list.files(pattern = "*.xlsx") #get list of files
+data.to.bind <- lapply(files, read_excel) #read in files using lapply
+all.data <- Reduce(function(...) rbind(..., all = T),data.to.bind)#bind all files
+```
+
+
+
+
