@@ -16,6 +16,8 @@ library("tidyr")
 library("readr")
 library("stringr")
 library("dplyr")
+library("gtools")
+library("plyr")
 ```
 
 ```{r}
@@ -103,6 +105,20 @@ data.to.bind <- lapply(files, read_excel) #read in files using lapply
 all.data <- Reduce(function(...) rbind(..., all = T),data.to.bind)#bind all files
 ```
 
+```{r}
+sheets <- readxl::excel_sheets("DipseaResults.xlsx")
+x <- lapply(sheets, function(X) readxl::read_excel("DipseaResults.xlsx", sheet = X))
+names(x) <- sheets; Year<- names(x)
+
+for( i in seq_along(x)){
+  x[[i]] <- x[[i]] %>% mutate(Year = Year[i])  #x = list of length 14 (years)
+}
+
+dipsea.all <- do.call('rbind.fill',x) #will want to rbind only with matching cols
+# use 'smartbind' in gtools library or rbind.fill in plyr package 
+head(dipsea.all)
+
+```
 
 
 

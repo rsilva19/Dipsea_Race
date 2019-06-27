@@ -1,0 +1,163 @@
+---
+title: "dataDipsea"
+author: "Rebecca Silva"
+date: "6/25/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r} 
+#packages
+library("readxl")
+library("tidyr")
+library("readr")
+library("stringr")
+library("dplyr")
+library("gtools")
+library("plyr")
+```
+
+###Read Data and Rbind
+```{r}
+sheets <- readxl::excel_sheets("DipseaResults.xlsx")
+x <- lapply(sheets, function(X) readxl::read_excel("DipseaResults.xlsx", sheet = X))
+names(x) <- sheets; Year<- names(x)
+
+for( i in seq_along(x)){
+  x[[i]] <- x[[i]] %>% mutate(Year = Year[i])  #x = list of length 14 (years)
+}
+
+dipsea.all <- do.call('rbind.fill',x) #will want to rbind only with matching cols
+# use 'smartbind' in gtools library or rbind.fill in plyr package 
+head(dipsea.all)
+tail(dipsea.all)
+```
+
+
+
+###Tidy w/o function
+```{r}
+names(dipsea.all) <- gsub(" ", "_", names(dipsea.all))
+
+#split up cols
+dipsea.all <- dipsea.all %>% 
+  separate("Section_/_Place_In_Section", c("Section", "Place_In_Section"), "/") %>%
+  separate("Group_/_Head_Start", c("Group", "Head_Start"), " / ") %>%
+  separate("Actual_Time_/_Place_(time-based)", c("Actual_Time", "Place_(time-based)"), "/") %>% 
+  separate("Group(HS)/Plc", c("Group09", "Place09"))
+  
+
+#make place numeric 
+dipsea.all$Place_Overall<- dipsea.all$Place_Overall %>% str_match_all("[0-9]+") %>%
+    as.numeric
+
+#make time cols numeric
+dipsea.all$Head_Start<- as.numeric(dipsea.all$Head_Start)
+
+char_to_mins<- function(col){
+  sapply(strsplit(col,":"), #convert char time to mins
+     function(x) {
+      x <- as.numeric(x)
+      if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+      else {x[2]+x[3]/60 + x[1]*60} 
+     }
+    )
+  }
+
+time<- gsub("\\..*", "", dipsea.all$Actual_Time) #remove milliseconds 
+dipsea.all$Actual_Time<- char_to_mins(time)
+
+time2 <- format(dipsea.all$ActualTime, format="%H:%M:%S")
+dipsea.all$ActualTime<- char_to_mins(time2)
+
+
+
+#fill NAs will vals from other cols 
+
+dipsea.fill<- dipsea.all %>% mutate(Actual_Time = coalesce(Actual_Time, ActualTime), 
+                                    Head_Start = coalesce(Head_Start, Headstart), 
+                                    Group = coalesce(Group, Group09))
+
+#check:
+head(dipsea.test %>% filter(Year ==2008))
+
+#checking
+dipsea_2010<- dipsea.fill %>% filter(Year == 2010, ActualTime > 120) %>% select("Actual_Time", "ActualTime")
+head(dipsea_2010)
+
+data_test<- ds %>% filter(Actual_Time <25)
+head(data_test)
+tail(data_test)
+
+
+ds <- dipsea.fill%>%
+    select("Place_Overall","Sex", "Age","Section", "Group", "Head_Start", "Actual_Time", "Place_(time-based)", "Year") %>% 
+    mutate(Even_Time = Actual_Time - Head_Start)  
+  
+
+#tidy specifics 
+ds$Sex[which(ds$Sex == "f")] <- "F"   #one observation with "f" instead of "F"
+ds$Section[which(ds$Section == "Invitational ")]<- "Invitational"
+ds$Section[which(ds$Section == "Inv.")]<- "Invitational"
+ds$Section[which(ds$Section == "INV ")]<- "Invitational"
+ds$Section[which(ds$Section == "Runner ")]<- "Runner"
+ds$Section[which(ds$Section == "DR ")]<- "Runner"
+
+#Test<- ds %>% mutate(SectionCat ifelse(Section == "Invitational " |, "Invitational"))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###Tidy Function (not needed)
+```{r}
+
+make_tidy<- function(ds){ 
+  names(ds) <- gsub(" ", "_", names(ds))
+
+#split up cols
+ds <- ds %>% 
+    separate("Section_/_Place_In_Section", c("Section", "Place_In_Section"), " / ") %>%
+    separate("Group_/_Head_Start", c("Group", "Head_Start"), " / ") %>%
+    separate("Actual_Time_/_Place_(time-based)", c("Actual_Time", "Place_(time-based)"), " / ") 
+
+#make place numeric 
+ds$Place_Overall<- ds$Place_Overall %>% str_match_all("[0-9]+") %>%
+    as.numeric
+#make time cols numeric
+ds$Head_Start<- as.numeric(ds$Head_Start)
+
+time<- gsub("\\..*", "", ds$Actual_Time) #remove milliseconds 
+ds$Actual_Time<- sapply(strsplit(time,":"), #convert char time to mins
+    function(x) {
+      x <- as.numeric(x)
+      if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+      else {x[2]+x[3]/60 + 60} 
+     }
+  )
+  ds <- ds%>%
+    select("Place_Overall","Sex", "Age","Section", "Group", "Head_Start", "Actual_Time", "Place_(time-based)") %>% 
+    mutate(Time = Actual_Time - Head_Start)  
+ # ds$Year <- gsub("dipsea", "", ds$Year) %>% as.numeric 
+}
+```

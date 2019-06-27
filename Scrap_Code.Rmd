@@ -48,12 +48,37 @@ read_excel_allsheetsT <- function(filename, tibble = T) {
     sheets <- readxl::excel_sheets(filename)
     x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
     names(x) <- sheets
-    x
+    #x
 }
+
+
+sheets <- readxl::excel_sheets("DipseaResults.xlsx")
+x <- lapply(sheets, function(X) readxl::read_excel("DipseaResults.xlsx", sheet = X))
+names(x) <- sheets; Year<- names(x)
+
+
+for( i in seq_along(x)){
+  x[[i]] <- x[[i]] %>% mutate(Year = Year[i])
+}
+
+two.data.test <- do.call('rbind',x) #will want to rbind only with matching cols
+# use 'smartbind' in gtools library or rbind.fill in plyr package 
+View(two.data.test)
 
 ```
 
 
+```{r}
+#made function so not needed
+dipsea.all$Actual_Time<- sapply(strsplit(time,":"), #convert char time to mins
+    function(x) {
+      x <- as.numeric(x)
+      if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+      else {x[2]+x[3]/60 + 60} 
+     }
+  )
+  
+```
 
 
 
