@@ -1,0 +1,20 @@
+---
+title: "NN_Model"
+author: "Rebecca Silva"
+date: "7/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mosaic)
+
+```
+
+```{r}
+gf_histogram(~ Age, data = ds) # not normal so will scale by 
+```
+

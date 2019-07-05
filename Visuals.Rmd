@@ -19,6 +19,9 @@ library(mosaic)
 p <- ggplot(ds, aes(Age, Actual_Time), na.rm = T)
 p + geom_jitter()
 
+
+gf_point(sqrt(Actual_Time) ~ Age, data = ds) %>% gf_lm()
+
 check<-  ds %>% filter(Actual_Time > 130) %>% select("Section", "Year")
 head(check)
 
@@ -34,6 +37,9 @@ p3 + geom_point() +geom_line()
 
 cor(ds, use="complete.obs")
 
+
+pSS <- ggplot(ds_new, aes( Age, Actual_Time, color = Sex_Section), na.rm = T)
+pSS + geom_point() 
 
 ```
 

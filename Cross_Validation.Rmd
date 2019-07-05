@@ -1,0 +1,26 @@
+---
+title: "Cross_Validation"
+author: "Rebecca Silva"
+date: "7/1/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(caTools)
+set.seed(123)
+ds_CV <- ds_new
+ds_CV$Split <- NA
+ds_CV$Split <- sample.split(seq_len(nrow(ds_CV)), SplitRatio = .75)
+train<- subset(ds_CV, Split == TRUE)
+test <- subset(ds_CV, Split == FALSE)
+
+pred <- predict(mod_SS_inter, newdata = test, type = "response")
+diff <- pred - test$Actual_Time
+diff2 <- (diff)^2
+mspe <- mean(diff2)
+```
+
