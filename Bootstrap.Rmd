@@ -1,0 +1,144 @@
+---
+title: "Bootstrap"
+author: "Rebecca Silva"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+n <- 1e4
+B <- 1000
+Age <- rep(c(6:80), 2)
+Sex <- c(rep("F", 75), rep("M", 75)) 
+Sex_NN<- c(rep(0, 75), rep(1, 75)) 
+newdata <- data.frame( Age , Sex)
+newdata_NN <- data.frame(Age, Sex_NN)
+```
+
+
+
+###bootstrap GAM sex
+```{r}
+
+draw <- function(data){
+  time_F <- c()
+  time_M <- c()
+  base_years <- c(27,30, 35)
+  index <- 1
+
+  grp <- sample_n(data, n, replace = T)
+  gam_train <- mgcv::gam(Actual_Time ~ s(Age, k = 20) + s(Age, by = as.factor(Sex), k = 40) + Sex, data = grp)  #train on sample
+  prediction <- predict(gam_train, newdata, type = "response")
+  prediction_data<- cbind(newdata, prediction)
+  
+  for (i in base_years){
+  time_F[index] <- unlist(prediction_data %>%                   #time for female 
+    filter(Age == i, Sex == "F") %>% 
+    select(prediction))   
+  
+  time_M[index] <- unlist(prediction_data %>%                  #time for male
+    filter(Age == i, Sex == "M") %>% 
+    select(prediction)) 
+  
+  index <- index + 1
+}
+female <- unlist(prediction_data %>% 
+               filter(Sex == "F") %>% 
+               select(prediction))
+#male <- unlist(prediction_data %>% 
+ #              filter(Sex == "M") %>% 
+  #             select(prediction))
+factor27_F = female/time_F[1] #;
+#factor27_M = male/time_M[1] 
+#factor30_F = female/time_F[2] ; factor30_M = male/time_M[2]
+#factor35_F = female/time_F[3] ; factor30_F = male/time_F[3]
+return(factor27_F) #if was to return all -make it a list 
+}
+
+factor27_F_Boot <- do(B)*draw(ds)
+F27_CI <- apply(as.matrix(factor27_F_Boot), 2, function(x){
+  mean(x)+c(-1.96,1.96)*sd(x)/sqrt(length(x))})
+
+```
+
+70% train 30% test in each bootstrap (dont need )
+
+###NN_Sex bootstrap 
+```{r}
+#ds_NN_shuffled<-scaled[sample(nrow(scaled)),]
+samplesize = 0.70 * nrow(ds_NN)
+set.seed(13)
+#shuffled<-scaled[sample(nrow(scaled)),]
+
+#scale new data 
+max = apply(newdata_NN, 2, max)
+min = apply(newdata_NN, 2, min)
+scaled_newdata <- scale(newdata_NN, center = min, scale = max- min)
+scaled_sex <- scaled %>% select(Sex_NN, Age, Actual_Time)
+
+#boot_NN <- function(scaled_data, samplesize){
+ index = sample( seq_len ( nrow ( scaled ) ), size = samplesize )
+  # train and test set
+  trainNN = scaled[index , ]
+  #testNN = scaled[-index , ]
+  NN_sex = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
+  predict_testNN = predict(NN_sex, scaled_newdata)
+  predict_rescale = (predict_testNN  * (max(ds_NN$Actual_Time) -min(ds_NN$Actual_Time)))          + min(ds_NN$Actual_Time) #rescale predicted times--- idk if its questionable             that i use ds_NN but thats how it was originally scaled 
+  prediction_data <- cbind(newdata_NN, predict_rescale)
+#all around 30 mins - time prediction is wrong - ie scaling incorrectly 
+ 
+  index <- 1
+  time_F_NN <- c()
+  time_M_NN <- c()
+for (i in base_years){
+  time_F_NN[index] <- unlist(prediction_data %>%                   #time for female 
+    filter(Age == i, Sex_NN == 0) %>% 
+    select(predict_rescale))   
+  
+#  time_M_NN[index] <- unlist(prediction_data %>%                  #time for male
+#    filter(Age == i, Sex_NN == 1) %>% 
+#    select(predict_rescale)) 
+  
+  index <- index + 1
+}
+female <- unlist(prediction_data %>% 
+               filter(Sex_NN == 0) %>% 
+               select(predict_rescale))
+#male <- unlist(prediction_data %>% 
+ #              filter(Sex_NN == 1) %>% 
+  #             select(predict_rescale))
+factor27_F_NN = female/time_F_NN[1] #;
+#factor27_M = male/time_M[1] 
+#factor30_F = female/time_F[2] ; factor30_M = male/time_M[2]
+#factor35_F = female/time_F[3] ; factor30_F = male/time_F[3]
+#return(factor27_F_NN) #if was to return all -make it a list 
+#}
+
+
+factor27_F_BootNN <- do(1)*boot_NN(scaled_sex)
+F27_CI <- apply(as.matrix(factor27_F_BootNN), 2, function(x){
+  mean(x)+c(-1.96,1.96)*sd(x)/sqrt(length(x))})
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+

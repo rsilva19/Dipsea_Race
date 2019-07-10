@@ -103,7 +103,7 @@ plot(mod_Base, se = T)
 summary(mod_Base) # R = .495
 mgcv::gam.check(mod_Base)
 
-mod_Sex <- mgcv::gam(Actual_Time ~ s(Age) + s(Age, by = as.factor(Sex), k = 20) + as.factor(Sex), data = ds) 
+mod_Sex <- mgcv::gam(Actual_Time ~ s(Age) + s(Age, by = as.factor(Sex), k = 40) + as.factor(Sex), data = ds) 
 summary(mod_Sex) #.295
 plot(mod_Sex, se = T)
 mgcv::gam.check(mod_Sex)
@@ -122,19 +122,37 @@ mod_SS_inter <- mgcv::gam(Actual_Time ~ s(Age, k= 20) + Sex_Section + s(Age, k =
 
 mgcv::gam.check(mod_SS_inter)
 
-mod_all_sep <- mgcv::gam(Actual_Time ~ s(Age, k= 60) + Sex + Section + s(Age, k= 60, by = as.factor(Sex)) + s(Age, k= 60, by = as.factor(Section)) , data = ds)  #.503
-
 anova(mod_SS, mod_SS_inter, test = "F")
 
 ```
 
+##Choosen model: "GAM" : for sex and section
+```{r}
+#wanted to keep Sex and Section sep. even though Sex_Section does a little better (.506)
+set.seed(34)
+GAM <- mgcv::gam(Actual_Time ~ s(Age, k= 40) + Sex + Section + s(Age, k= 60, by = as.factor(Sex)) + s(Age, k= 60, by = as.factor(Section)) , data = ds)  #.503
+
+plot(GAM, se = T)
+summary(GAM) 
+
+mgcv::gam.check(GAM)
 
 
+#test if sex interaction needed with anova
+GAM_minus <- mgcv::gam(Actual_Time ~ s(Age, k= 40) + Sex + Section + s(Age, k= 60, by = as.factor(Section)) , data = ds) 
 
+anova(GAM_minus, GAM, test = "F") #yes, needed
+```
 
 ```{r}
-x_new <- seq(0, max(x), length.out = 100)
-y_pred <- predict(gam_y, data.frame(x = x_new))
+set.seed(35)
+gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 20) + s(Age, by = as.factor(Sex), k = 40) + Sex, data = ds) 
+summary(gam_sex)
+plot(gam_sex, se = T)
+mgcv::gam.check(gam_sex)
 
-check(mod5) #residuals
+
 ```
+
+
+
