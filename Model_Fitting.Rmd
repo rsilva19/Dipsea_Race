@@ -146,7 +146,7 @@ anova(GAM_minus, GAM, test = "F") #yes, needed
 
 ```{r}
 set.seed(35)
-gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 20) + s(Age, by = as.factor(Sex), k = 40) + Sex, data = ds) 
+gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 40) + s(Age, by = as.factor(Sex), k = 60) + Sex, data = ds) 
 summary(gam_sex)
 plot(gam_sex, se = T)
 mgcv::gam.check(gam_sex)
