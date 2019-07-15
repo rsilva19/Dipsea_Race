@@ -144,12 +144,34 @@ GAM_minus <- mgcv::gam(Actual_Time ~ s(Age, k= 40) + Sex + Section + s(Age, k= 6
 anova(GAM_minus, GAM, test = "F") #yes, needed
 ```
 
+
+###Model for just sex 
 ```{r}
+
+###### train to find RMSE 
+samplesize = 0.70 * nrow(ds_NN)
+index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
+
+# Create training and test set
+datatrain = ds[ index, ]
+datatest = ds[ -index, ]
+
 set.seed(35)
-gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 40) + s(Age, by = as.factor(Sex), k = 60) + Sex, data = ds) 
+gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 40) + s(Age, by = as.factor(Sex), k = 60) + Sex, data = datatrain) 
 summary(gam_sex)
 plot(gam_sex, se = T)
 mgcv::gam.check(gam_sex)
+
+###predict 
+
+pred <- predict(gam_sex, datatest)
+
+
+y <- ds$Actual_Time[-index ]  #true data for tested
+
+RMSE.GAM <- (sum((y - pred)^2) / nrow(datatest)) ^ 0.5 #16.5
+
+
 
 
 ```

@@ -98,7 +98,7 @@ set.seed(13)
 max = apply(newdata_NN, 2, max)
 min = apply(newdata_NN, 2, min)
 scaled_newdata <- scale(newdata_NN, center = min, scale = max- min)
-scaled_sex <- scaled %>% select(Sex_NN, Age, Actual_Time)
+#scaled_sex <- scaled %>% select(Sex_NN, Age, Actual_Time)
 
 #boot_NN <- function(scaled_data, samplesize){
  index = sample( seq_len ( nrow ( scaled ) ), size = samplesize )
@@ -107,10 +107,10 @@ scaled_sex <- scaled %>% select(Sex_NN, Age, Actual_Time)
   #testNN = scaled[-index , ]
   NN_sex = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
   predict_testNN = predict(NN_sex, scaled_newdata)
-  predict_rescale = (predict_testNN  * (max(ds_NN$Actual_Time) -min(ds_NN$Actual_Time)))  + min(ds_NN$Actual_Time) #rescale predicted times--- idk if its questionable that i use ds_NN but thats how it was originally scaled 
+  predict_rescale = (predict_testNN * (max(ds_NN$Actual_Time) - min(ds_NN$Actual_Time)))  + min(ds_NN$Actual_Time) #rescale predicted times--- idk if its questionable that i use ds_NN but thats how it was originally scaled 
   prediction_data <- cbind(newdata_NN, predict_rescale)
 
- 
+
   index <- 1
   time_F_NN <- c()
   time_M_NN <- c()

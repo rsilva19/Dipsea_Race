@@ -51,4 +51,11 @@ cmatrix<- sapply(list, cbind)
 
 bind_rows(lapply(list, stack))
 ```
+```{r}
+f <- prediction_data %>% filter(Sex_NN == 0) 
+
+time27 <- unlist(f %>% filter(Age == 27) %>% select(predict_rescale))
+
+f/time27
+```
 

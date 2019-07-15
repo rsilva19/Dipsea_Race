@@ -1,0 +1,38 @@
+---
+title: "NN_BootwTrain"
+author: "Rebecca Silva"
+date: "7/14/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(caret)
+library(nnet)
+library(NeuralNetTools)
+```
+
+```{r}
+index = sample( seq_len ( nrow ( scaled) ), size = samplesize ) 
+train = scaled[index , ] 
+test = testdataSection
+scaled_test <- scaled_testdataSection
+```
+
+```{r}
+model.nn <- train(Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = train,
+                  method = "nnet")
+print(model.nn)
+```
+
+
+```{r}
+predictions <- predict(model.nn, test[,1:14])
+accuracy <- sum(predictions == test[,15])/length(test[,15])
+print(accuracy)
+```
+

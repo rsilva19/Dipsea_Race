@@ -47,7 +47,7 @@ testNN = scaled[-index , ]
 
 # fit neural network
 set.seed(21)
-NN = neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , trainNN, hidden = 3 , linear.output = T, stepmax = 1e7 )
+NN = neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
 
 # plot neural network
 plot(NN)
@@ -58,6 +58,10 @@ plot(NN)
 
 predict_testNN = predict(NN, testNN)
 predict_testNN = (predict_testNN * (max(ds_NN$Actual_Time) - min(ds_NN$Actual_Time))) + min(ds_NN$Actual_Time)
+
+tester<- predict(NN, scaled_testdataSection)
+tester_larger <- (tester * (max(ds_NN$Actual_Time) - min(ds_NN$Actual_Time))) + min(ds_NN$Actual_Time)
+testdf <- cbind(testdataSection, tester_larger)
 
 x<- ds_NN$Actual_Time[-index ]  #true data for tested
 
@@ -126,7 +130,7 @@ testNN = scaled[-index , ]
 
 # fit neural network
 set.seed(21)
-NN = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
+NN_sex = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
 
 # plot neural network
 plot(NN)
@@ -147,7 +151,7 @@ plot(x, predict_testNN, col='blue', pch=16, ylab = "predicted rating NN", xlab =
 abline(0,1)
 
 # Calculate Root Mean Square Error (RMSE)
-RMSE.NN = (sum((x - predict_testNN)^2) / nrow(x)) ^ 0.5
+RMSE.NN = (sum((x - as.vector(predict_testNN))^2) / length(x)) ^ 0.5
 ```
 
 ```{r}
