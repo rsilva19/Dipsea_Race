@@ -13,26 +13,200 @@ knitr::opts_chunk$set(echo = TRUE)
 library(caret)
 library(nnet)
 library(NeuralNetTools)
+library(tidyr)
+library(ggplot2)
 ```
 
 ```{r}
-index = sample( seq_len ( nrow ( scaled) ), size = samplesize ) 
+index = sample( seq_len ( nrow ( scaled) ), size = nrow(scaled) ) 
 train = scaled[index , ] 
-test = testdataSection
-scaled_test <- scaled_testdataSection
+Age <- rep(c(6:80), 4)
+Sex_NN<- c(rep(0, 150), rep(1, 150))
+Section_NN <- c(rep(0, 75), rep(1, 75), rep(0, 75), rep(1, 75)) 
+test <- data.frame( Age , Sex_NN, Section_NN)
+
+###scale test data 
+max = apply(test, 2, max)  #newdata_NN has age and binary sex
+min = apply(test, 2, min)
+test_scaled <- scale(test, center = min, scale = max - min)
 ```
 
+###Boot Function - gets factors 
 ```{r}
-model.nn <- train(Actual_Time ~ Age + Section_NN + Sex_NN,
+
+boot_nnet<- function (data, testdata, test_scaled, orig_data){
+  index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
+  train = data[index , ]
+  model.nn <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
                   data = train,
-                  method = "nnet")
-print(model.nn)
+                  method = "nnet",
+                  trace = FALSE) # add linout = T next time 
+  
+  predictions <- predict( model.nn, test_scaled )
+  predictions_rescale = (predictions * (max(orig_data$Actual_Time) - 
+                                        min(orig_data$Actual_Time)))+ 
+    min(orig_data$Actual_Time)
+  prediction_data <- cbind(test, predictions_rescale)  
+
+  index <- 1
+  time_FR_NN <- c(); time_FI_NN <- c()
+  time_MR_NN <- c(); time_MI_NN <- c()
+  female <- prediction_data %>% filter(Sex_NN == 0) 
+  male <- prediction_data %>% filter(Sex_NN == 1) 
+  
+  for (age in base_years){ #gets base times (27,30,35)
+     time_FR_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+     time_FI_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    time_MR_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+    time_MI_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    
+    index <- index + 1
+  }
+  
+femaleR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale)) #times for females all ages 
+femaleI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+maleR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale))
+maleI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+
+#factor27_F_NN = femaleNN/time_F_NN[1] #;
+#factor27_M_NN = maleNN/time_M_NN[1] 
+out$factor30_FR = femaleR_time/time_FR_NN[2]
+out$factor30_FI = femaleI_time/time_FI_NN[2]
+out$factor30_MR = maleR_time/time_MR_NN[2]
+out$factor30_MI = maleI_time/time_MI_NN[2]#times divided by time at age 30 
+#factor35_F = female/time_F[3] ; factor30_F = male/time_F[3]
+
+  return( out )
+}
 ```
 
+##Bootstrap and tidy output 
+```{r}
+out <- list()
+times <- do(10)* boot_nnet(data = scaled, 
+                           test_scaled = test_scaled, 
+                           orig_data = ds_NN) 
+
+factors30_NN <- lapply(times, function(x){  
+  as.data.frame(sapply(x,rbind))
+  })
+```
+
+
+##Summarize the 1,000 /(10) bootstrap factors for each age 
+```{r}
+CI30_Norm <- lapply(factors30_NN, function(x){
+  apply(as.matrix(x), 1, function(x){
+  mean(x)+c(-1.96,1.96)*sd(x)/sqrt(length(x))
+  })
+}) #next step : visualizing each 
+
+CI30_Quant <- lapply(factors30_NN, function(x){
+  apply(as.matrix(x), 1, function(x){
+  c(quantile(x,.05), quantile(x,.95))
+  })
+})
+
+
+factors30_CI<- lapply(factors30_NN, function(x){
+  apply(x, 1, function(x){
+    c(Mean = mean(x), lb = quantile(x, .05), ub = quantile(x, .95))
+    })
+})
+factors30_CI<- lapply(factors30_CI, function(x){t(x)})
+
+### make 4 dataframes 
+df30_FR <- data.frame("Age" = Age75, 
+                      "Mean" = factors30_CI$factor30_FR[,1],
+                      "lb" = factors30_CI$factor30_FR[,2],
+                      "ub" = factors30_CI$factor30_FR[,3])
+df30_FI <- data.frame("Age" = Age75, 
+                      "Mean" = factors30_CI$factor30_FI[,1],
+                      "lb" = factors30_CI$factor30_FI[,2],
+                      "ub" = factors30_CI$factor30_FI[,3])
+df30_MR <- data.frame("Age" = Age75,
+                      "Mean" = factors30_CI$factor30_MR[,1],
+                      "lb" = factors30_CI$factor30_MR[,2],
+                      "ub" = factors30_CI$factor30_MR[,3])
+df30_MI <- data.frame("Age" = Age75,
+                      "Mean" = factors30_CI$factor30_MI[,1],
+                      "lb" = factors30_CI$factor30_MI[,2],
+                      "ub" = factors30_CI$factor30_MI[,3])
+
+
+dftester <- data.frame(Age75, tester$mean, tester$lowerbound, tester$upperbound)
+
+########## 1. Area of CI 
+
+plot( tester.mean ~ Age75, data = dftester, type = 'n')
+# fill
+polygon(c(rev(dftester$Age75), dftester$Age75), c(rev(dftester[ ,4]), dftester[ ,3]), col = 'grey80', border = NA)
+# intervals
+lines(dftester$Age75, dftester[ ,3], lty = 'dashed', col = 'red')
+lines(dftester$Age75, dftester[ ,2], lty = 'dashed', col = 'red')
+
+
+############ 2. CI plot with points plotrix
+
+df2 <- data.frame(x=dftester$Age75,
+                 fit=dftester$tester.mean,
+                 lwr=dftester$tester.lowerbound,
+                 upr=dftester$tester.upperbound)
+ plot(fit~x,data=df2,ylim=range(c(df2$lwr,df2$upr)))
+ with(df2,polygon(c(x,rev(x)),c(lwr,rev(upr)),col = "grey75", border = FALSE))
+ matlines(df2[,1],df2[,-1],
+          lwd=c(2,1,1),
+          lty=1,
+          col=c("black","red","red"))
+ 
+ 
+require(plotrix)
+plotCI(Age75, dftester$tester.mean, ui=dftester$tester.upperbound, li=dftester$tester.lowerbound)
+
+############# 3. CI plot with points and poly ggplot 
+
+ggplot(dftester, aes(x = Age75, y = tester.mean)) +
+  geom_point(size = .05) +
+  geom_errorbar(aes(ymax = tester.upperbound, ymin = tester.lowerbound)) +
+  geom_ribbon(data = dftester, aes( ymin = tester.lowerbound, ymax = tester.upperbound), alpha = 0.3)
+
+```
+
+
+
+### Visuals 
 
 ```{r}
-predictions <- predict(model.nn, test[,1:14])
-accuracy <- sum(predictions == test[,15])/length(test[,15])
-print(accuracy)
-```
+ggplot(aes(x = Age), data = df30_FI) +
+  geom_point(data = df30_FR, aes( x = Age, y = Mean), size= 0.05, color = "blue") +
+  geom_errorbar(data = df30_FR, aes(ymax = ub, ymin = lb), color = "blue") +
+  geom_ribbon(data = df30_FR, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_FI, aes( x = Age, y = Mean), size= 0.05, color = "red") +
+  geom_errorbar(data = df30_FI, aes(ymax = ub, ymin = lb), color = "red") +
+  geom_ribbon(data = df30_FI, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_MI, aes( x = Age, y = Mean), size= 0.05, color = "green") +
+  geom_errorbar(data = df30_MI, aes(ymax = ub, ymin = lb), color = "green") +
+  geom_ribbon(data = df30_MI, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_MR, aes( x = Age, y = Mean), size= 0.05, color = "black") +
+  geom_errorbar(data = df30_MR, aes(ymax = ub, ymin = lb), color = "black") +
+  geom_ribbon(data = df30_MR, aes( ymin = lb, ymax = ub), alpha = 0.3)
+  
 
+ggplot() + geom_point( data = dfr, aes(Age75, fr), color = "blue") +
+  geom_point( data = dmr, aes(Age75, mr), color = "red") +
+  geom_point( data = dfi, aes(Age75, fi), color = "green") +
+  geom_point( data = dmi, aes(Age75, mi), color = "black")
+
+```
