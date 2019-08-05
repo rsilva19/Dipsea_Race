@@ -1,0 +1,131 @@
+---
+title: 'Summary'
+author: "Rebecca Silva"
+date: "8/4/2019"
+output: 
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+  html_document:
+    fig_height: 3
+    fig_width: 5
+  word_document:
+    fig_height: 3
+    fig_width: 5
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  tidy=FALSE,     # display code as typed
+  size="small")   # slightly smaller font for code
+```
+
+## Dipsea Race 
+
+###Data 
+```{r}
+head(ds)  #created in DipseaData.Rmd
+head(ds_NN) #created in NN_Model
+```
+
+###Confidence Intervals for Factors
+* Basic Idea: Find age-ratio for ages 27, 30, 35. Compare Age-ratio by sex with Age-ratio by sex and section. 
+ + bootstrap gam/NN 1000/100 times: caret::train $model = "gam"$ or $model = "nnet"$.
+ + sex only model not very strong 
+  - For Neural Network best R-Squared ~ .26 (compared with ~ .5 for Sex, Section and Section alone R-Squared ~ .43) 
+  - For GAM best R-Squared ~ .27 (compared with ~ .49 for Sex, Section and Section alone R-Squared ~ .42) 
+  
+####Neural Network Model Bootstrap 
+
+Example of bootstrap fn (Sex and Section model): 
+```{r}
+boot_nnet<- function (data, testdata, test_scaled, orig_data){
+  index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
+  train = data[index , ]
+  model.nn <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = train,
+                  method = "nnet",
+                  trace = FALSE)
+  predictions <- predict( model.nn, test_scaled )
+  predictions_rescale = (predictions * (max(orig_data$Actual_Time) - 
+                                        min(orig_data$Actual_Time)))+ 
+    min(orig_data$Actual_Time)
+  prediction_data <- cbind(test, predictions_rescale)  
+
+  index <- 1
+  time_FR_NN <- c(); time_FI_NN <- c()
+  time_MR_NN <- c(); time_MI_NN <- c()
+  female <- prediction_data %>% filter(Sex_NN == 0) 
+  male <- prediction_data %>% filter(Sex_NN == 1) 
+  
+  for (age in base_years){ #gets base times (27,30,35)
+     time_FR_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+     time_FI_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    time_MR_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+    time_MI_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    
+    index <- index + 1
+  }
+  
+FR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale)) # times for females all ages 
+FI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+MR_time <- unlist(male %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale))
+MI_time <- unlist(male %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+
+out$factor30_FR = FR_time/time_FR_NN[2]
+out$factor30_FI = FI_time/time_FI_NN[2]
+out$factor30_MR = MR_time/time_MR_NN[2]
+out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30 
+
+  return( out )
+}
+
+#returns list of 4, each has 75 rows of B length vectors
+```
+
+After tidying output:
+```{r}
+head(factors30_SexSectiondf)
+head(factors30_Sexdf)
+```
+
+
+#####Visuals
+```{r}
+require(gridExtra)
+SexNN.plot
+SexSectionNN.plot
+grid.arrange(SexNN.plot, SexSectionNN.plot, ncol = 2)
+```
+
+#### GAM Results: 
+```{r}
+head(factors30_Sexdf)
+head(factors30_SexSectiondf)
+```
+
+```{r}
+SexGAM.plot
+SexSectionGAM.plot
+grid.arrange(SexGAM.plot, SexSectionGAM.plot, ncol = 2)
+```
+
+
+## US Masters Swimming Data (Top 10)
+
+In Google Doc folder: 'USMS_Top10_SCY.cvs', 'USMS_Top10_LCM.csv', 'USMS_Top10_SCM.csv'
+
+
+

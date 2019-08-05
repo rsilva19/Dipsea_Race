@@ -1,0 +1,184 @@
+
+```{r}
+test<- c("59:27.10", "58:51.36", "1:26:31.57")
+test<- gsub("\\..*", "", test) #remove milliseconds 
+lapply(strsplit(test,":"),
+  function(x) {
+    x <- as.numeric(x)
+    if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+    else {x[2]+x[3]/60 + 60} 
+    }
+)
+  
+test2 <- lapply(dipsea2019[7], function(x) { x= gsub("\\..*", "", x)}) #remove milliseconds
+#dipseaTEST<- gsub("\\..*", "", dipsea2019[7]) #remove milliseconds 
+splt<- lapply(test2, function(x) {x = strsplit(x,":")})
+
+num<- lapply(splt, function(x) {x = as.numeric(x)})
+
+
+new<- lapply(splt,
+  function(x) {
+    x <- as.numeric(x)
+    if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+    else {x[2]+x[3]/60 + 60} 
+    }
+)
+```
+
+```{r}
+files <- list.files(pattern = "*.xlsx") #get list of files
+test.data <- lapply(files, read_excel) #read in files using lapply
+two.data <- do.call('rbind',data.to.bind)#bind all files
+
+
+library(readxl)    
+read_excel_allsheetsF <- function(filename, tibble = FALSE) {
+    # I prefer straight data.frames
+    # but if you like tidyverse tibbles (the default with read_excel)
+    # then just pass tibble = TRUE
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    if(!tibble) x <- lapply(x, as.data.frame)
+    names(x) <- sheets
+    x
+}
+
+read_excel_allsheetsT <- function(filename, tibble = T) {
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    names(x) <- sheets
+    #x
+}
+
+
+sheets <- readxl::excel_sheets("DipseaResults.xlsx")
+x <- lapply(sheets, function(X) readxl::read_excel("DipseaResults.xlsx", sheet = X))
+names(x) <- sheets; Year<- names(x)
+
+
+for( i in seq_along(x)){
+  x[[i]] <- x[[i]] %>% mutate(Year = Year[i])
+}
+
+two.data.test <- do.call('rbind',x) #will want to rbind only with matching cols
+# use 'smartbind' in gtools library or rbind.fill in plyr package 
+View(two.data.test)
+
+```
+
+
+```{r}
+#made function so not needed
+dipsea.all$Actual_Time<- sapply(strsplit(time,":"), #convert char time to mins
+    function(x) {
+      x <- as.numeric(x)
+      if (is.na(x[3])) {x[1]+x[2]/60}  #no hour place 
+      else {x[2]+x[3]/60 + 60} 
+     }
+  )
+  
+```
+
+
+
+```{r}
+##BIC metric calculation
+true <- scaled$Actual_Time[index]
+BIC <- function(data){
+  trainTargets <- 
+}
+
+
+  #df <- as.data.frame( predictions_rescale )
+  #out <- cbind( out, df )
+
+names(times) <- c("id", "Time", "id2", "BootNumber")
+times <- within(times, rm(id, id2)) %>% spread(times, key = BootNumber, value = Time )
+result <- cbind(times, test)
+```
+
+##get factors
+```{r}
+#get est. times for age 27, 30, 35
+basetime_FR_NN <- c(); basetime_FI_NN <- c() 
+basetime_MR_NN <- c(); basetime_MI_NN <- c()
+#result<- within(result, rm(id))
+result %>% filter(Sex_NN == 0, Section_NN == 0, Age == 27) 
+Age27 <-  cbind(result[,11:13], Mean = rowMeans(result[,1:10]))
+result$mean <- 
+  #result %>% filter(Age == 27) %>% select(-Age, -Sex_NN, -Section_NN)))
+
+rowMeans(unlist(result[,1:10]))
+rowMeans(result)
+
+str(result$`10`)
+
+tester$mean <- apply(tester, 1, function(x){mean(x) })
+tester$lowerbound <- apply(tester, 1, function(x){mean(x) -
+    1.96*sd(x)/sqrt(length(x)) })
+tester$upperbound <- apply(tester, 1, function(x){mean(x) +
+    1.96*sd(x)/sqrt(length(x)) })
+
+```
+
+
+```{r}
+
+
+dftester <- data.frame(Age75, tester$mean, tester$lowerbound, tester$upperbound)
+
+########## 1. Area of CI 
+
+plot( tester.mean ~ Age75, data = dftester, type = 'n')
+# fill
+polygon(c(rev(dftester$Age75), dftester$Age75), c(rev(dftester[ ,4]), dftester[ ,3]), col = 'grey80', border = NA)
+# intervals
+lines(dftester$Age75, dftester[ ,3], lty = 'dashed', col = 'red')
+lines(dftester$Age75, dftester[ ,2], lty = 'dashed', col = 'red')
+
+
+############ 2. CI plot with points plotrix
+
+df2 <- data.frame(x=dftester$Age75,
+                 fit=dftester$tester.mean,
+                 lwr=dftester$tester.lowerbound,
+                 upr=dftester$tester.upperbound)
+ plot(fit~x,data=df2,ylim=range(c(df2$lwr,df2$upr)))
+ with(df2,polygon(c(x,rev(x)),c(lwr,rev(upr)),col = "grey75", border = FALSE))
+ matlines(df2[,1],df2[,-1],
+          lwd=c(2,1,1),
+          lty=1,
+          col=c("black","red","red"))
+ 
+ 
+require(plotrix)
+plotCI(Age75, dftester$tester.mean, ui=dftester$tester.upperbound, li=dftester$tester.lowerbound)
+
+############# 3. CI plot with points and poly ggplot 
+
+ggplot(dftester, aes(x = Age75, y = tester.mean)) +
+  geom_point(size = .05) +
+  geom_errorbar(aes(ymax = tester.upperbound, ymin = tester.lowerbound)) +
+  geom_ribbon(data = dftester, aes( ymin = tester.lowerbound, ymax = tester.upperbound), alpha = 0.3)
+```
+
+
+playing with output of boot_nnet 
+```{r}
+CI30_Norm <- lapply(factors30_NN, function(x){
+  apply(as.matrix(x), 1, function(x){
+  mean(x)+c(-1.96,1.96)*sd(x)/sqrt(length(x))
+  })
+}) #next step : visualizing each 
+
+CI30_Quant <- lapply(factors30_NN, function(x){
+  apply(as.matrix(x), 1, function(x){
+  c(quantile(x,.05), quantile(x,.95))
+  })
+})
+
+### ^^ not used 
+
+```
+

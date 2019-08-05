@@ -13,7 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(caret)
 library(nnet)
 library(NeuralNetTools)
-library(mosaic)
+library(tidyr)
+library(ggplot2)
 ```
 
 ```{r}
@@ -37,8 +38,7 @@ boot_nnet<- function (data, testdata, test_scaled, orig_data){
   model.nn <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
                   data = train,
                   method = "nnet",
-                  trace = FALSE)
-                
+                  trace = FALSE) # add linout = T next time 
   
   predictions <- predict( model.nn, test_scaled )
   predictions_rescale = (predictions * (max(orig_data$Actual_Time) - 
@@ -93,11 +93,11 @@ out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30
 ##Bootstrap and tidy output 
 ```{r}
 out <- list()
-out <- do(10)* boot_nnet(data = scaled, 
+times <- do(10)* boot_nnet(data = scaled, 
                            test_scaled = test_scaled, 
                            orig_data = ds_NN) 
 
-factors30_NN <- lapply(out, function(x){  
+factors30_NN <- lapply(times, function(x){  
   as.data.frame(sapply(x,rbind))
   })
 ```
@@ -158,7 +158,7 @@ SexSectionNN.plot <- ggplot(aes(x = Age), data = df30_FI) +
   ylab("Factor (Age = 30)") +
   scale_x_continuous(limits = c(6, 80), expand = c(0, 1)) +
   theme(legend.position = 'top', 
-        legend.spacing.x = unit(1.0, 'cm'), 
+        legend.spacing.x = unit(1, 'cm'), 
         legend.key.size = unit(.2, "cm"))
 
 

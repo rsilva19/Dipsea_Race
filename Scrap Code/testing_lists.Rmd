@@ -1,0 +1,203 @@
+---
+title: "Test list"
+author: "Rebecca Silva"
+date: "7/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+a <- c(1,2,3)
+b <- c(5,6,3)
+c <- c(4,3,8)
+df<- as.data.frame(rbind(a,b,c))
+```
+
+```{r}
+# generating example data
+a <- 1:5
+names(a)<- c("2018-01-01", "2018-01-15", "2018-01-19", "2018-01-20",                                                                                                   
+             "2018-02-15")
+b <- 11:16
+names(b)<- c("2018-01-01", "2018-01-19", "2018-01-20", "2018-01-29", 
+             "2018-02-12", "2018-02-15")
+l <- list(a=a,b=b)
+
+# including dates in list
+l$adates <- names(l$a)
+l$bdates <- names(l$b)
+
+# creating empty data frame to merge with
+df <- data.frame(dates=character())
+
+# merge
+df <- merge(df, l[c("a","adates")], by.x="dates", by.y="adates", all=TRUE)
+df <- merge(df, l[c("b","bdates")], by.x="dates", by.y="bdates", all=TRUE)
+```
+
+```{r}
+list <- factor30_gam$factor30_F
+list2 <- factor30_gam$factor30_M
+matrix<- sapply(list, rbind)
+df <- as.data.frame(matrix)
+lapply(factor30_gam, function(x){
+  as.data.frame(sapply(x,rbind))
+})
+df2 <- as.data.frame(sapply(list2, rbind))
+cmatrix<- sapply(list, cbind)
+
+bind_rows(lapply(list, stack))
+```
+```{r}
+f <- prediction_data %>% filter(Sex_NN == 0) 
+
+time27 <- unlist(f %>% filter(Age == 27) %>% select(predict_rescale))
+
+f/time27
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+index = sample( seq_len ( nrow ( scaled) ), size = nrow(scaled) ) 
+train = scaled[index , ] 
+Age <- rep(c(6:80), 4)
+Sex_NN<- c(rep(0, 150), rep(1, 150))
+Section_NN <- c(rep(0, 75), rep(1, 75), rep(0, 75), rep(1, 75)) 
+test <- data.frame( Age , Sex_NN, Section_NN)
+
+###scale test data 
+max = apply(test, 2, max)  #newdata_NN has age and binary sex
+min = apply(test, 2, min)
+test_scaled <- scale(test, center = min, scale = max - min)
+```
+
+###Boot Function - gets factors 
+```{r}
+
+#boot_nnet<- function (data, testdata, test_scaled, orig_data){
+set.seed(2)
+  index = sample( seq_len ( nrow ( scaled) ), size = nrow( scaled ) ) 
+  train = scaled[index , ]
+  model.nn <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = train,
+                  method = "nnet",
+                  trace = FALSE) # add linout = T next time 
+  
+  predictions <- predict( model.nn, test_scaled )
+  predictions_rescale = (predictions * (max(ds_NN$Actual_Time) - 
+                                        min(ds_NN$Actual_Time)))+ 
+    min(ds_NN$Actual_Time)
+prediction_data <- cbind(test, predictions_rescale)  
+isrecale<- cbind(test, predictions)
+  index <- 1
+  time_FR_NN <- c(); time_FI_NN <- c()
+  time_MR_NN <- c(); time_MI_NN <- c()
+  female <- prediction_data %>% filter(Sex_NN == 0) 
+  male <- prediction_data %>% filter(Sex_NN == 1) 
+  
+  for (age in base_years){ #gets base times (27,30,35)
+     time_FR_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+     time_FI_NN[index] <- unlist(female %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    time_MR_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 0) %>% 
+                               select(predictions_rescale))
+    time_MI_NN[index] <- unlist(male %>% 
+                               filter(Age == age, Section_NN == 1) %>% 
+                               select(predictions_rescale))
+    
+    index <- index + 1
+  }
+  
+femaleR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale)) # times for females all ages 
+femaleI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+maleR_time <- unlist(male %>% filter(Section_NN == 0) %>% 
+               select(predictions_rescale))
+maleI_time <- unlist(male %>% filter(Section_NN == 1) %>% 
+               select(predictions_rescale))
+
+
+out$factor30_FR = femaleR_time/time_FR_NN[2]
+out$factor30_FI = femaleI_time/time_FI_NN[2]
+out$factor30_MR = maleR_time/time_MR_NN[2]
+out$factor30_MI = maleI_time/time_MI_NN[2]#times divided by time at age 30 
+
+
+  #return( out )
+#}
+```
+
+##Bootstrap and tidy output 
+```{r}
+out <- list()
+times <- do(10)* boot_nnet(data = scaled, 
+                           test_scaled = test_scaled, 
+                           orig_data = ds_NN) 
+
+factors30_NN <- lapply(times, function(x){  
+  as.data.frame(sapply(x,rbind))
+  })
+```
+
+
+
+
+```{r}
+index = sample( seq_len ( nrow (scaled) ), size = nrow( scaled ) ) 
+  train = scaled[index , ]
+  model.nn <- train( Actual_Time ~ Age + Sex_NN,
+                  data = train,
+                  method = "nnet",
+                  trace = FALSE) # add linout = T next time 
+  #print(model.nn)
+  predictions <- predict( model.nn, test2_scaled )
+  predictions_rescale = (predictions * (max(ds_NN$Actual_Time) - 
+                                        min(ds_NN$Actual_Time)))+ 
+    min(ds_NN$Actual_Time)
+  prediction_data <- cbind(test2, predictions_rescale)  
+
+  index <- 1
+  base_years <- c(27, 30, 35)
+  time_F_NN <- c()
+  time_M_NN <- c()
+  female <- prediction_data %>% filter(Sex2_NN == 0) 
+  male <- prediction_data %>% filter(Sex2_NN == 1) 
+  
+  for (age in base_years){ #gets base times (27,30,35)
+     time_F_NN[index] <- unlist(female %>% 
+                               filter(Age2 == age) %>% 
+                               select(predictions_rescale))
+     time_M_NN[index] <- unlist(female %>% 
+                               filter(Age2 == age) %>% 
+                               select(predictions_rescale))
+    index <- index + 1
+  }
+  
+F_time <- unlist(female %>% select(predictions_rescale)) # times for females all ages 
+M_time <- unlist(female %>% select(predictions_rescale))
+
+
+#factor27_F_NN = femaleNN/time_F_NN[1] #;
+#factor27_M_NN = maleNN/time_M_NN[1] 
+out$factor30_F = F_time/time_F_NN[2]
+out$factor30_M = M_time/time_M_NN[2]
+```
+
+
