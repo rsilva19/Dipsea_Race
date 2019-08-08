@@ -98,9 +98,10 @@ out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30
 After tidying output:
 ```{r}
 head(factors30_SexSectiondf)
+tail(factors30_SexSectiondf,20)
 head(factors30_Sexdf)
 ```
-
+take average of of any age divded by 30 
 
 #####Visuals
 ```{r}
@@ -112,8 +113,9 @@ grid.arrange(SexNN.plot, SexSectionNN.plot, ncol = 2)
 
 #### GAM Results: 
 ```{r}
-head(factors30_Sexdf)
-head(factors30_SexSectiondf)
+head(factors30_SexGAMdf)
+tail(factors30_SexGAMdf,20)
+head(factors30_SexSectionGAMdf)
 ```
 
 ```{r}

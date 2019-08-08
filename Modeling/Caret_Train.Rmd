@@ -1,0 +1,160 @@
+---
+title: "Section vs Sex"
+author: "Rebecca Silva"
+date: "7/22/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(caret) # for train()
+library(nnet)  # for nnet()
+library(NeuralNetTools)  # for neuralnet()
+library(tidyr)
+library(ggplot2)
+library(mosiac)
+library(mgcv)  # for gam()
+```
+Exploring the train() function which either uses CV or bootstrap to find optimal model. At first, I test with train() without specifying hidden layers for the Nearual network model or basis dimension for the GAM model. 
+
+## Sex and Age, Neural network
+```{r}
+index = sample( seq_len ( nrow (scaled) ), size = nrow( scaled ) ) 
+train = scaled[index , ]
+set.seed(23)
+model.SexNN <- train( Actual_Time ~ Age + Sex_NN,
+                  data = train,
+                  method = "nnet",
+                  trace = FALSE) 
+print(model.SexNN) #best Rsquared = .26, RMSE = .07846
+```
+
+##Section, Sex and Age, Neural Network
+```{r}
+index = sample( seq_len ( nrow (scaled) ), size = nrow( scaled ) ) 
+train = scaled[index , ]
+set.seed(32)
+model.SectionNN <- train( Actual_Time ~ Age + Section_NN,
+                  data = train,
+                  method = "nnet",
+                  trace = FALSE) # add linout = T next time 
+print(model.SectionNN)  #best RMSE = .06937, Rsquared = .423
+```
+
+## Sex, Section, and age, Neural Network w specifications 
+```{r}
+## specify boot vs CV and number of reps 
+ctrl <- trainControl(method = "boot", number = 10, returnResamp = "all")
+# specify number of hidden layers and regularization paraters (decay) to try in train
+nnetGrid <-  expand.grid(size = seq(from = 1, to = 3, by = 1),
+                        decay = seq(from = 0.0, to = 0.3, by = 0.05))
+
+model.SectionNN <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = scaled,
+                  method = "nnet",
+                  metric = "Rsquared",
+                  trControl = ctrl,
+                  tuneGrid = nnetGrid,
+                  trace = FALSE)  
+print(model.SectionNN)
+
+
+model.SectionNN2 <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = scaled,
+                  method = "nnet",
+                  trControl = ctrl,
+                  tuneGrid = nnetGrid,
+                  trace = FALSE) # add linout = T next time 
+print(model.SectionNN2)
+
+```
+
+```{r}
+# after using train to chose size and decay, we can just train one model using nnet()
+
+nnet_model <- nnet(Actual_Time ~ Age + Section_NN + Sex_NN,
+                  data = scaled, size = 2)
+print(nnet_model)
+predict(nnet_model, test_scaled) # prediction not working
+```
+
+
+## GAM
+```{r}
+index = sample( seq_len ( nrow ( ds_NN) ), size = nrow( ds_NN ) ) 
+train = ds_NN[index , ]
+train2 = ds[index,]
+
+set.seed(2)
+model.SexGAM <- train( Actual_Time ~ Age + Sex_NN,
+                  data = train,
+                  method = "gam",
+                  trace = FALSE) # add linout = T next time 
+
+print(model.SexGAM) #rsquared= .269 rmse = 0.0776
+
+ 
+ 
+set.seed(4)
+model.SexGAM2 <-train( Actual_Time ~ Age  + Section_NN,
+                  data = train,
+                  method = "gam",
+                  trace = FALSE)
+
+print(model.SexGAM2) #RMSE = 0.065, Rsquare = .4905
+  
+model.SexGAM3 <-train( Actual_Time ~ Age + Sex + Section,
+                  data = train2,
+                  method = "gam",
+                  trace = FALSE) 
+print(model.SexGAM3) #rsquared = .495
+
+```
+
+Look further into caret::train() using "gam". 
+1. See how train() is fitting model without any specification of degrees of freedom or basis dimension. 
+2. Look at variation in train() gam models
+3. Add specifications?
+
+
+```{r}
+# 1.
+modelGAM <- train( Actual_Time ~ Age + Section + Sex,
+                  data = ds,
+                  method = "gam",
+                  trace = FALSE)
+print(modelGAM)
+summary(modelGAM)
+# 2. 
+modelGAM1 <- modelGAM
+modelGAM2 <- train( Actual_Time ~ Age + Section + Sex,
+                  data = ds,
+                  method = "gam",
+                  trace = FALSE)
+summary(modelGAM2) # barely changing 
+modelGAM3 <- train( Actual_Time ~ Age + Section + Sex,
+                  data = ds,
+                  method = "gam",
+                  trace = FALSE)
+
+# 3. with specifications
+
+modelGAM <- train( Actual_Time ~ Age + Section + Sex,
+                  data = ds,
+                  method = "gam",
+                  trControl = trainControl(method = "boot", number = 10), 
+                  tuneGrid = data.frame(method = "REML", select = FALSE),
+                  trace = FALSE)
+
+print(modelGAM)
+# train only gives one option of a model to choose from. Not ideal. Therefore want gam() and not train() with 'gam' specification in bootstrap. 
+```
+
+
+
+
+

@@ -5,72 +5,88 @@ date: "7/22/2019"
 output: html_document
 ---
 
+Rmd finds factors using gam model that uses imputs sex, section, and age. 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-Age <- rep(c(6:80), 4)
-Sex_NN <- c(rep(1, 150), rep(0, 150))
-Section_NN <- c(rep(1, 75), 
-             rep(0, 75), rep(1, 75), rep(0, 75)) 
-testGAM <- data.frame( Age , Sex_NN, Section_NN)
+library(mgcv)
 ```
 
+```{r}
+# creates test set (all poss combinations- 300 observations)
+Age <- rep(c(6:80), 4)
+Sex <- c(rep("M", 150), rep("F", 150))
+Section<- c(rep("Invitational", 75), 
+             rep("Runner", 75), rep("Invitational", 75), rep("Runner", 75)) 
+testGAM <- data.frame( Age , Sex, Section)
+```
 
 ```{r}
-boot_gam<- function (data, testdata){
-  index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
+# bootstrap fn 
+boot_gam<- function (data, testdata, samplesize){
+  index = sample( seq_len ( nrow ( data ) ), size = samplesize )
   train = data[index , ]
-  model <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
-                  data = train,
-                  method = "gam",
-                  trace = FALSE)
+  #model <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
+                 # data = train,
+                 # method = "gam",
+                 # trace = FALSE)
   
+  model <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + 
+                 s(Age, k= 10, by = as.factor(Sex)) + 
+                 s(Age, k= 10, by = as.factor(Section)) , 
+               method  = 'REML' , data = train) 
+  # predict
   predictions <- predict( model, testdata )
-
+  
+  # bind predicted values with all age, sex, and section combinations
   prediction_data <- cbind(testdata, predictions)  
 
+  # initialize objects for upcoming loop
   index <- 1
   time_FR_NN <- c(); time_FI_NN <- c()
   time_MR_NN <- c(); time_MI_NN <- c()
-  female <- prediction_data %>% filter(Sex_NN == 0) 
-  male <- prediction_data %>% filter(Sex_NN == 1) 
   
-  for (age in base_years){ #gets base times (27,30,35)
+  # predicted times for females and males 
+  female <- prediction_data %>% filter(Sex == "F") 
+  male <- prediction_data %>% filter(Sex == "M") 
+  
+  # finds prediction for ages 27, 30, 35 
+  for (age in base_years){ 
      time_FR_NN[index] <- unlist(female %>% 
-                               filter(Age == age, Section_NN == 0) %>% 
+                               filter(Age == age, Section == "Runner") %>% 
                                select(predictions))
      time_FI_NN[index] <- unlist(female %>% 
-                               filter(Age == age, Section_NN == 1) %>% 
+                               filter(Age == age, Section == "Invitational") %>% 
                                select(predictions))
     time_MR_NN[index] <- unlist(male %>% 
-                               filter(Age == age, Section_NN == 0) %>% 
+                               filter(Age == age, Section == "Runner") %>% 
                                select(predictions))
     time_MI_NN[index] <- unlist(male %>% 
-                               filter(Age == age, Section_NN == 1) %>% 
+                               filter(Age == age, Section == "Invitational") %>% 
                                select(predictions))
     
     index <- index + 1
   }
   
-FR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
+  # find predictions for each combination 
+  FR_time <- unlist(female %>% filter(Section == "Runner") %>% 
                select(predictions)) # times for females all ages 
-FI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
+  FI_time <- unlist(female %>% filter(Section == "Invitational") %>% 
                select(predictions))
-MR_time <- unlist(male %>% filter(Section_NN == 0) %>% 
+  MR_time <- unlist(male %>% filter(Section == "Runner") %>% 
                select(predictions))
-MI_time <- unlist(male %>% filter(Section_NN == 1) %>% 
+  MI_time <- unlist(male %>% filter(Section == "Invitational") %>% 
                select(predictions))
 
-#factor27_F_NN = femaleNN/time_F_NN[1] #;
-#factor27_M_NN = maleNN/time_M_NN[1] 
-out$factor30_FR = FR_time/time_FR_NN[2]
-out$factor30_FI = FI_time/time_FI_NN[2]
-out$factor30_MR = MR_time/time_MR_NN[2]
-out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30 
-#factor35_F = female/time_F[3] ; factor30_F = male/time_F[3]
-
+  # finds factors by dividing predicted times by predicted base times (27, 30, 35)
+  out$factor30_FR = FR_time/time_FR_NN[2]#times divided by time at age 30 
+  out$factor30_FI = FI_time/time_FI_NN[2]
+  out$factor30_MR = MR_time/time_MR_NN[2]
+  out$factor30_MI = MI_time/time_MI_NN[2]
+  #divide by time_FI_GAM[1] and time_FI_GAM[3] for age 27 and 35 respectively 
   return( out )
 }
 ```
@@ -78,10 +94,15 @@ out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30
 ##Bootstrap and tidy output 
 ```{r}
 out <- list()
-out <- do(10)* boot_gam(data = ds_NN, 
-                        testdata = testGAM) 
+B <- 10 # number of bootstrap samples 
 
-factors30_GAM <- lapply(out, function(x){  
+# returns list of 4, each has B columns of vector len 75 (all poss ages)
+output30_GAM <- do(B)* boot_gam(data = ds, 
+                        testdata = testGAM, 
+                        samplesize = 0.85 * nrow(ds)) 
+
+# tidy - make each list a dataframe with B cols and 75 rows
+factors30_GAM <- lapply(output30_GAM, function(x){  
   as.data.frame(sapply(x,rbind))
   })
 ```
@@ -122,6 +143,7 @@ df30_MI_gam <- data.frame("Age" = Age75,
 
 ##Dataframe
 ```{r}
+# df with mean, lb, ub, for each age- sex- and section
 factors30_SexSectionGAMdf <- do.call("rbind", list(df30_FI_gam, df30_MI_gam, df30_FR_gam, df30_MR_gam ))
 ```
 
@@ -129,31 +151,20 @@ factors30_SexSectionGAMdf <- do.call("rbind", list(df30_FI_gam, df30_MI_gam, df3
 ### Visuals 
 
 ```{r}
+# plot gives CI and mean of all 4 catergories 
 SexSectionGAM.plot <- ggplot(aes(x = Age), data = df30_FI_gam) +
-  geom_point(data = df30_FR_gam, 
-             aes( x = Age, y = Mean, color = "green"), size= 0.05) +
-  geom_errorbar(data = df30_FR_gam, 
-                aes(ymax = ub, ymin = lb), color = "green") +
-  geom_ribbon(data = df30_FR_gam, 
-              aes( ymin = lb, ymax = ub), alpha = 0.3) +
-  geom_point(data = df30_FI_gam, 
-             aes( x = Age, y = Mean, color = "red"), size= 0.05) +
-  geom_errorbar(data = df30_FI_gam, 
-                aes(ymax = ub, ymin = lb), color = "red") +
-  geom_ribbon(data = df30_FI_gam, 
-              aes( ymin = lb, ymax = ub), alpha = 0.3) +
-  geom_point(data = df30_MI_gam, 
-             aes( x = Age, y = Mean, color = "blue"), size= 0.05) +
-  geom_errorbar(data = df30_MI_gam, 
-                aes(ymax = ub, ymin = lb), color = "blue") +
-  geom_ribbon(data = df30_MI_gam, 
-              aes( ymin = lb, ymax = ub), alpha = 0.3) +
-  geom_point(data = df30_MR_gam, 
-             aes( x = Age, y = Mean, color = "black"), size= 0.05) +
-  geom_errorbar(data = df30_MR_gam, 
-                aes(ymax = ub, ymin = lb), color = "black") +
-  geom_ribbon(data = df30_MR_gam, 
-              aes( ymin = lb, ymax = ub), alpha = 0.3) + 
+  geom_point(data = df30_FR_gam, aes( x = Age, y = Mean, color = "green"), size= 0.05) +
+  geom_errorbar(data = df30_FR_gam, aes(ymax = ub, ymin = lb), color = "green") +
+  geom_ribbon(data = df30_FR_gam, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_FI_gam, aes( x = Age, y = Mean, color = "red"), size= 0.05) +
+  geom_errorbar(data = df30_FI_gam, aes(ymax = ub, ymin = lb), color = "red") +
+  geom_ribbon(data = df30_FI_gam, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_MI_gam, aes( x = Age, y = Mean, color = "blue"), size= 0.05) +
+  geom_errorbar(data = df30_MI_gam, aes(ymax = ub, ymin = lb), color = "blue") +
+  geom_ribbon(data = df30_MI_gam, aes( ymin = lb, ymax = ub), alpha = 0.3) +
+  geom_point(data = df30_MR_gam, aes( x = Age, y = Mean, color = "black"), size= 0.05) +
+  geom_errorbar(data = df30_MR_gam, aes(ymax = ub, ymin = lb), color = "black") +
+  geom_ribbon(data = df30_MR_gam, aes( ymin = lb, ymax = ub), alpha = 0.3) + 
   scale_color_manual("", 
                      labels=c("Male Runner", "Male Invitational",  "Female Runner", "Female Invitational"),
                      values = c(blue = "blue",red = "red", green = "green", black = "black")) +

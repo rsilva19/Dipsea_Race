@@ -18,7 +18,7 @@ test2 <- data.frame( "Age" = Age2 , "Sex_NN" = Sex2_NN)
 
 ###Boot Function - gets factors 
 ```{r}
-
+# bootstrap fn 
 boot_gam_SexOnly<- function (data, testdata){
   index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
   train = data[index , ]
@@ -27,18 +27,23 @@ boot_gam_SexOnly<- function (data, testdata){
                   method = "gam",
                   trace = FALSE,
                   linout = T) # add linout = T next time 
-  
+  # predict
   predictions <- predict( model.nn, testdata)
   
+  # bind rescaled predicted values with all age, sex, and section combinations
   prediction_data <- cbind(testdata, predictions)  
 
+  # initialize objects for upcoming loop
   index <- 1
   base_years <- c(27, 30, 35)
   time_F_GAM <- c()
   time_M_GAM <- c()
+  
+  # predicted times for females and males
   female <- prediction_data %>% filter(Sex_NN == 0) 
   male <- prediction_data %>% filter(Sex_NN == 1) 
   
+  # finds prediction for ages 27, 30, 35 
   for (age in base_years){ #gets base times (27,30,35)
      time_F_GAM[index] <- unlist(female %>% 
                                filter(Age == age) %>% 
@@ -49,16 +54,14 @@ boot_gam_SexOnly<- function (data, testdata){
     index <- index + 1
   }
   
-F_time <- unlist(female %>% select(predictions)) # times for females all ages 
-M_time <- unlist(male %>% select(predictions))
+  # find predictions for each combination (both sexes)
+  F_time <- unlist(female %>% select(predictions)) 
+  M_time <- unlist(male %>% select(predictions))
 
-
-#factor27_F_NN = femaleNN/time_F_NN[1] #;
-#factor27_M_NN = maleNN/time_M_NN[1] 
-out$factor30_F = F_time/time_F_GAM[2]
-out$factor30_M = M_time/time_M_GAM[2]#times divided by time at age 30 
-
-#factor35_F = female/time_F[3] ; factor35_M = male/time_F[3]
+  # finds factors by dividing predicted times by predicted base times   (27, 30, 35)
+  out$factor30_F = F_time/time_F_GAM[2]#times divided by time at age 30 
+  out$factor30_M = M_time/time_M_GAM[2]
+#divide by time_F_GAM[1] and time_F_GAM[3] for age 27 and 35 respectively
 
   return( out )
 }
@@ -67,7 +70,7 @@ out$factor30_M = M_time/time_M_GAM[2]#times divided by time at age 30
 ##Bootstrap and tidy output 
 ```{r}
 out <- list()
-out <- do(10)* boot_gam_SexOnly(data = ds_NN, 
+out <- do(1000)* boot_gam_SexOnly(data = ds_NN, 
                            testdata = test2) 
 
 factors30_GAM_SexOnly <- lapply(out, function(x){  
@@ -132,3 +135,17 @@ SexGAM.plot
 SexSectionGAM.plot
 grid.arrange(SexGAM.plot, SexSectionGAM.plot, ncol = 2)
 ```
+
+
+##Dataframe
+
+```{r}
+df30_F_gam <- cbind(df30_F_gam, "Sex" = rep("Female", nrow(df30_F_gam)))
+df30_M_gam <- cbind(df30_M_gam, "Sex" = rep("Male", nrow(df30_M_gam)))
+factors30_SexGAMdf <- rbind.data.frame(df30_F_gam, df30_M_gam)
+
+
+write.csv(factors30_SexGAMdf, "GAM30_Sex", row.names = F)
+write.csv(factors30_SexSectionGAMdf, "GAM30_SexSection", row.names = F)
+```
+

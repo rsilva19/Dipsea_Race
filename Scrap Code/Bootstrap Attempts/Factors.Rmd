@@ -1,0 +1,130 @@
+---
+title: "Factors"
+author: "Rebecca Silva"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This rmd is used to figure out how to get factors from the prediction. I use this type of code in within my bootstrap functions. 
+
+###GAM:Sex and Section
+```{r}
+# 3 factors: ratio w 27, 30, 35
+
+#create new data
+Age <- rep(c(6:80), 4)
+Sex <- c(rep("F", 150 ), rep("M",150)) 
+Section <- c(rep("Runner",75), rep("Invitational", 75), rep("Runner",75), rep("Invitational", 75))
+
+newdata <- data.frame( Age , Sex, Section)
+
+
+#GAM predict 
+set.seed(55)
+prediction <- predict(GAM, newdata, type = "response")
+prediction_data<- cbind(newdata, prediction)
+
+time_FR <- c()
+time_FI <- c()
+time_MR <- c()
+time_MI <- c()
+base_years <- c(27,30, 35)
+index <- 1
+
+for (i in base_years){
+  time_FR[index] <- unlist(prediction_data %>%                   #time for female runner
+    filter(Age == i, Sex == "F", Section =="Runner") %>% 
+    select(prediction))   
+  
+  time_FI[index] <- unlist(prediction_data %>%                  #time for female invitational
+    filter(Age == i, Sex == "F", Section =="Invitational") %>% 
+    select(prediction)) 
+  
+  time_MR[index] <-  unlist(prediction_data %>% 
+    filter(Age == i, Sex == "M", Section =="Runner") %>% 
+    select(prediction)) 
+  
+  time_MI[index] <-  unlist(prediction_data %>% 
+    filter(Age == i, Sex == "M", Section =="Invitational") %>% 
+    select(prediction)) 
+  
+  index <- index + 1
+}
+
+
+FR <- unlist(prediction_data %>% 
+               filter(Sex == "F", Section == "Runner") %>% 
+               select(prediction))
+FI <- unlist(prediction_data %>% 
+               filter(Sex == "F", Section == "Invitational") %>% 
+               select(prediction))
+MR <- unlist(prediction_data %>% 
+               filter(Sex == "M", Section == "Runner") %>% 
+               select(prediction))
+MI <- unlist(prediction_data %>% 
+               filter(Sex == "M", Section == "Invitational") %>% 
+               select(prediction))
+
+factor27_FR = FR/time_FR[1] ; factor27_FI = FI/time_FI[1]  
+factor27_MR = MI/time_MR[1] ; factor27_MI = MI/time_MI[1]
+  
+factor30_FR = FR/time_FR[2] ; factor30_FI = FI/time_FI[2]
+factor30_MR = MR/time_MR[2] ; factor30_MI = MI/time_MI[2]
+  
+factor35_FR = FR/time_FR[3] ; factor30_FI = FI/time_FR[3]
+factor35_MR = MR/time_MR[3] ; factor30_MI = MI/time_MI[3]
+# to get CI would get 1000 factor27_FR and create CI from that 
+```
+
+###GAM:Sex 
+
+```{r}
+Age <- rep(c(6:80), 2)
+Sex <- c(rep("F", 75), rep("M", 75)) 
+
+newdata <- data.frame( Age , Sex)
+
+
+#GAM_sex
+set.seed(3)
+prediction <- predict(gam_sex, newdata, type = "response")
+prediction_data<- cbind(newdata, prediction)
+
+time_F <- c()
+time_M <- c()
+base_years <- c(27,30, 35)
+index <- 1
+
+for (i in base_years){
+  time_F[index] <- unlist(prediction_data %>%                   #time for female 
+    filter(Age == i, Sex == "F") %>% 
+    select(prediction))   
+  
+  time_M[index] <- unlist(prediction_data %>%                  #time for male
+    filter(Age == i, Sex == "M") %>% 
+    select(prediction)) 
+  
+  index <- index + 1
+}
+
+
+female <- unlist(prediction_data %>% 
+               filter(Sex == "F") %>% 
+               select(prediction))
+male <- unlist(prediction_data %>% 
+               filter(Sex == "M") %>% 
+               select(prediction))
+
+factor27_F = female/time_F[1]  ; factor27_M = male/time_M[1] 
+  
+factor30_F = female/time_F[2] ; factor30_M = male/time_M[2]
+  
+factor35_F = female/time_F[3] ; factor30_F = male/time_F[3]
+
+# to get CI would get 1000 factor27_FR and create CI from that 
+```
+

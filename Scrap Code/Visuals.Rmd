@@ -1,0 +1,45 @@
+---
+title: "Visualizations"
+author: "Rebecca Silva"
+date: "6/26/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("ggplot2")
+library("dplyr")
+library(mosaic)
+```
+
+```{r}
+p <- ggplot(ds, aes(Age, Actual_Time), na.rm = T)
+p + geom_jitter()
+
+
+gf_point(sqrt(Actual_Time) ~ Age, data = ds) %>% gf_lm()
+
+check<-  ds %>% filter(Actual_Time > 130) %>% select("Section", "Year")
+head(check)
+
+p2 <- ggplot(ds, aes( Age, Actual_Time, color = Section), na.rm = T)
+p2 + geom_point() + facet_wrap(~ Year)
+
+pSex <- ggplot(ds, aes( Age, Actual_Time, color = Sex), na.rm = T)
+pSex + geom_point() + facet_wrap(~ Year)
+
+
+p3 <- ggplot(ds, aes(Age, Even_Time, color = Year), na.rm = T)
+p3 + geom_point() +geom_line()
+
+cor(ds, use="complete.obs")
+
+
+pSS <- ggplot(ds_new, aes( Age, Actual_Time, color = Sex_Section), na.rm = T)
+pSS + geom_point() 
+
+```
+
