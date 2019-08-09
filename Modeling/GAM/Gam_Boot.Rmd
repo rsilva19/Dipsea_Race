@@ -29,6 +29,7 @@ testGAM <- data.frame( Age , Sex, Section)
 boot_gam<- function (data, testdata, samplesize){
   index = sample( seq_len ( nrow ( data ) ), size = samplesize )
   train = data[index , ]
+  #old model-- decided to not use train()
   #model <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
                  # data = train,
                  # method = "gam",

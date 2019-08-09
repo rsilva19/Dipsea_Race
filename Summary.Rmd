@@ -1,7 +1,7 @@
 ---
-title: 'Summary'
+title: 'Summary/Guide'
 author: "Rebecca Silva"
-date: "8/4/2019"
+date: "Summer 2019"
 output: 
   pdf_document:
     fig_height: 3
@@ -20,114 +20,43 @@ knitr::opts_chunk$set(
   size="small")   # slightly smaller font for code
 ```
 
-## Dipsea Race 
+# Dipsea Race Project 
+Our goal was to build a model to better optimize the head starts in the Dipsea Race so that runners of any age had an equal chance of winning. In the past decade, the winners of the Dipsea Race have been in or around their 60s, and we want a model that makes it possible for runners with no head start to catch up.
+More concretely, we want to find a 95% confidence interval for the factors at each age, sex, and section. A factor is the ratio between the time at one age to the time at a 'base' age. We define the base ages as 27, 30, and 35 years old; however, my work in this study focuses on factors with base age 30 for the purpose of efficiency. Finding the other factors can be easily outlined and is commented in the code.  
 
-###Data 
-```{r}
-head(ds)  #created in DipseaData.Rmd
-head(ds_NN) #created in NN_Model
-```
+## Data 
+We start by reading in the data from all past races (since 1996). The 'Data Reading' folder contains the code for reading in all the data from the website: https://www.dipsea.org/prevresults.php. I first copy and pasted the race results 'by order of finish' into excel and then used the 'readxl' package to read in the data. 'Data_Final.Rmd' contains code to read in and tidy the data, creating the final data set, 'ds', which I use to construct any other data set later in the study. The key variables we use are Sex (“M”, “W”), Section (“Invitational”, “Runner”), Age (6-80yrs), and Actual_Time (time without head start, mins). 
 
-###Confidence Intervals for Factors
-* Basic Idea: Find age-ratio for ages 27, 30, 35. Compare Age-ratio by sex with Age-ratio by sex and section. 
- + bootstrap gam/NN 1000/100 times: caret::train $model = "gam"$ or $model = "nnet"$.
- + sex only model not very strong 
-  - For Neural Network best R-Squared ~ .26 (compared with ~ .5 for Sex, Section and Section alone R-Squared ~ .43) 
-  - For GAM best R-Squared ~ .27 (compared with ~ .49 for Sex, Section and Section alone R-Squared ~ .42) 
-  
-####Neural Network Model Bootstrap 
+Other important data sets that are used are 'ds_NN' and 'scaled', both created in the 'NN_Model.Rmd' within the 'Modeling' folder. 
 
-Example of bootstrap fn (Sex and Section model): 
-```{r}
-boot_nnet<- function (data, testdata, test_scaled, orig_data){
-  index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
-  train = data[index , ]
-  model.nn <- train( Actual_Time ~ Age + Section_NN + Sex_NN,
-                  data = train,
-                  method = "nnet",
-                  trace = FALSE)
-  predictions <- predict( model.nn, test_scaled )
-  predictions_rescale = (predictions * (max(orig_data$Actual_Time) - 
-                                        min(orig_data$Actual_Time)))+ 
-    min(orig_data$Actual_Time)
-  prediction_data <- cbind(test, predictions_rescale)  
+ * 'ds_NN': From 'ds', the data set selects only the key variables and changes Sex and Section to binary variables. 
+ * 'scaled': From ds_NN, this data set is the data normalization of 'ds_NN'. Each column has values between 0 and 1. I decided to scale instead of normalize after doing some univariate analysis of the continuous variables Age and Actual_Time.   
 
-  index <- 1
-  time_FR_NN <- c(); time_FI_NN <- c()
-  time_MR_NN <- c(); time_MI_NN <- c()
-  female <- prediction_data %>% filter(Sex_NN == 0) 
-  male <- prediction_data %>% filter(Sex_NN == 1) 
-  
-  for (age in base_years){ #gets base times (27,30,35)
-     time_FR_NN[index] <- unlist(female %>% 
-                               filter(Age == age, Section_NN == 0) %>% 
-                               select(predictions_rescale))
-     time_FI_NN[index] <- unlist(female %>% 
-                               filter(Age == age, Section_NN == 1) %>% 
-                               select(predictions_rescale))
-    time_MR_NN[index] <- unlist(male %>% 
-                               filter(Age == age, Section_NN == 0) %>% 
-                               select(predictions_rescale))
-    time_MI_NN[index] <- unlist(male %>% 
-                               filter(Age == age, Section_NN == 1) %>% 
-                               select(predictions_rescale))
-    
-    index <- index + 1
-  }
-  
-FR_time <- unlist(female %>% filter(Section_NN == 0) %>% 
-               select(predictions_rescale)) # times for females all ages 
-FI_time <- unlist(female %>% filter(Section_NN == 1) %>% 
-               select(predictions_rescale))
-MR_time <- unlist(male %>% filter(Section_NN == 0) %>% 
-               select(predictions_rescale))
-MI_time <- unlist(male %>% filter(Section_NN == 1) %>% 
-               select(predictions_rescale))
+## Modeling 
+My work exploring Generalized Additive Models (GAM) and Neural Networks can be found in the folder 'Modeling'. 
 
-out$factor30_FR = FR_time/time_FR_NN[2]
-out$factor30_FI = FI_time/time_FI_NN[2]
-out$factor30_MR = MR_time/time_MR_NN[2]
-out$factor30_MI = MI_time/time_MI_NN[2]#times divided by time at age 30 
+### General Additive Models (GAM) 
+The GAM model is an extension of the GLM model. We chose to use a GAM model over a polynomial regression model because gams can better extrapolate, be more flexible with curves as we do not have to specify a functional form, and are less prone to overfitting. My work with gam modeling and adding a model to a bootstrap function can be found in the 'GAM' folder within the 'Modeling' folder. The 'Caret_Train.Rmd' within the 'Modeling' folder explores both modeling technqiues using the train() function in the 'caret' package.  
 
-  return( out )
-}
+For gam models we use the 'mgcv' package. The main model we are working with is $ActualTime = s(Age) + Sex + Section + s(Age, by = as.factor(Sex) + s(Age, by = as. factor(Section)$. My work with gam models and understanding splines and degrees of freedom is in 'GAM_Explore.Rmd'. We can determine the smoothness through adjusting k, the basis dimension, which sets the maximum limit for degrees of freedom. The effective degrees of freedom (edf) is determined by the method for fitting used (GCV, AIC, or REML etc). I used the REML method since it is the default and was recommended by papers since REML penalizes over-fitting more than generalized cross validation. By hand, I adjusted for k by checking if the edf was close to k-1 and if so, I would make k larger to assure the degrees of freedom is large enough. The function gam.check() will give the edf used for each input variable. 
 
-#returns list of 4, each has 75 rows of B length vectors
-```
+We have had issues with overfitting in the gam model. As you will find in 'GAM_Explore.Rmd' even when I keep the basis dimension (k) set to 10 or lower, training 2 to 3 models with the data set 'ds' gives the same prediction with no variation. Although our initial idea was to bootstrap the whole data set and predict on a test set that consisted of every possible combination of age, sex, (and section), I have found that the only way to get enough variation with gam() is to bootstrap a sample of the data each time. As you will find in 'GAM_Boot.Rmd', I sample 85% of the data each time; this percentage can be adjusted as desired. 
 
-After tidying output:
-```{r}
-head(factors30_SexSectiondf)
-tail(factors30_SexSectiondf,20)
-head(factors30_Sexdf)
-```
-take average of of any age divded by 30 
-
-#####Visuals
-```{r}
-require(gridExtra)
-SexNN.plot
-SexSectionNN.plot
-grid.arrange(SexNN.plot, SexSectionNN.plot, ncol = 2)
-```
-
-#### GAM Results: 
-```{r}
-head(factors30_SexGAMdf)
-tail(factors30_SexGAMdf,20)
-head(factors30_SexSectionGAMdf)
-```
-
-```{r}
-SexGAM.plot
-SexSectionGAM.plot
-grid.arrange(SexGAM.plot, SexSectionGAM.plot, ncol = 2)
-```
+'Gam_Boot.Rmd' and 'Gam_SexOnly.Rmd' are similar R documents that contain the 'final' code to output a dataframe with a 95% confidence interval for factors at each age, sex, and section and age and sex, respectively. Once one feels confident about the model they are training, the number of bootstraps (B) should be increased to 1,000. Both documents have detailed commenting. 
 
 
-## US Masters Swimming Data (Top 10)
+### Neural Network Model (NN) 
+Neural network models imitates the processes of neurons in the brain. The model is trained by using 'hidden layers' to generate weights between the input and output layers. The input layers for this model are Age, Sex, and Section and the output layer is Actual_Time. The hidden layers choose weights of input variables through back propagation. I have read that one hidden layer is usually good enough for the model we are building. The typical rule is that the number of hidden layers should be between the input layer size and output layer, or $2/3$ of the input layer.
 
-In Google Doc folder: 'USMS_Top10_SCY.cvs', 'USMS_Top10_LCM.csv', 'USMS_Top10_SCM.csv'
+The first step in Neural network models is to normalize the data. I used the scale() function and lapply() to go through the data and scale each column. I worked with the packages 'neuralnet' and 'nnet' to build neural network models. The pros of neuralnet() are that we are able to specify arguments of the model such as number of hidden layers (unlike caret::train). The major con is that I have yet to see it predict times well and takes a while to train 1 model. It can take over an hour to train a model with neuralnet, and the error turns out pretty large. When inputs are just Age and Sex, the hidden layer is set to 1, but with Age, Sex, and Section, I try 2 hidden layers. 
+
+I used the train function in the caret package and nnet package to train a neural network with nnet(). In the 'Caret_Train.Rmd', I explore using train() with gam and neural network models. I can use train to find the ‘best’ model by a certain metric and then use nnet() to train one model with that specific metric. However, I found that just using nnet() to get a model did not work. My predictions came out as zeroes. The other option is that I can use train() within the bootstrap method so that each time it trains a model, it goes through many possible combinations of decay and size. The issue we are finding with train(), is that the model is not accurate. For example, the factor for a 65 year-old, male, invitational runner, should be around 1.28 but instead we get around 1.4. I was not able to build a neural network model that predicted time well; the models seem biased since they are overestimating Actual_Time. Thus, the neural network model is still a work in progress. 
+
+'NNet_Boot.Rmd' and 'NNet_SexOnly.Rmd' are similar to the 'Gam_Boot.Rmd' and 'Gam_SexOnly.Rmd' R documents that contain the 'final' code to output a dataframe with a 95% confidence interval for factors at each age, sex, and section and age and sex, respectively. Once one feels confident about the model they are training, the number of bootstraps (B) should be increased. Both documents have detailed commenting. 
+
+# US Masters Swimming Data (Top 10)
+
+My work on scraping the US Masters Swimming National data in the MastersSwimming proj shared on github. The document 'AllTabls.Rmd' contains the code I used to obtain all the data from the website: https://www.usms.org/comp/tt/toptenlist.php. I used the 'rvest' package to scrape the contents. In Google Doc folder shared with you I have uploaded the 3 final data sets: 'USMS_Top10_SCY.csv' (Short Course Yards), 'USMS_Top10_LCM.csv' (Long Course Meters), 'USMS_Top10_SCM.csv' (Short Course Meters). 
 
 
 

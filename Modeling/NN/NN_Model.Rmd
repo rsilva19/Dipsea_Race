@@ -14,42 +14,37 @@ library(mosaic)
 library(neuralnet)
 ```
 
-```{r}
-gf_histogram(~ Age, data = ds) # not normal so will scale by normalization (not stadardization)
-gf_histogram(~ Actual_Time, data = ds)
 
+## Data Normalization 
+```{r}
+gf_histogram(~ Age, data = ds) # not normal so will scale by normalization (not standardization)
+gf_histogram(~ Actual_Time, data = ds) #not normal 
 
 ds_NN <- ds %>% mutate(Section_NN = ifelse(Section == "Runner", 0, 1), 
                        Sex_NN = ifelse(Sex == "F", 0 , 1)) %>% 
         select(Age, Section_NN, Sex_NN, Actual_Time) # make cat vars binary 
 
-#scale for NN
+#  scaling data 
 max = apply(ds_NN, 2, max)
 min = apply(ds_NN, 2, min)
 scaled <- as.data.frame(scale(ds_NN, center = min, scale = max - min))
 ```
-
+## Train and Test 
 ```{r}
 # Random sampling
 samplesize = 0.70 * nrow(ds_NN)
 set.seed(13)
 index = sample( seq_len ( nrow ( ds_NN ) ), size = samplesize )
 
-# Create training and test set
-datatrain = ds_NN[ index, ]
-datatest = ds_NN[ -index, ]
-```
-
-```{r}
 # train and test set
 trainNN = scaled[index , ]
 testNN = scaled[-index , ]
 
 # fit neural network
-set.seed(21)
-NN = neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
+#set.seed(21) - if you want same model everytime
+NN <-  neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7, threshold = .01 ) #hidden = 1 faster but larger error 
 
-# plot neural network
+# plot neural network 
 plot(NN)
 ```
 
@@ -59,32 +54,23 @@ plot(NN)
 predict_testNN = predict(NN, testNN)
 predict_testNN = (predict_testNN * (max(ds_NN$Actual_Time) - min(ds_NN$Actual_Time))) + min(ds_NN$Actual_Time)
 
-tester<- predict(NN, scaled_testdataSection)
-tester_larger <- (tester * (max(ds_NN$Actual_Time) - min(ds_NN$Actual_Time))) + min(ds_NN$Actual_Time)
-testdf <- cbind(testdataSection, tester_larger)
-
 x<- ds_NN$Actual_Time[-index ]  #true data for tested
 
-plot(x, predict_testNN, col='blue', pch=16, ylab = "predicted rating NN", xlab = "real rating")
+plot(x, predict_testNN, col='blue', pch=16, ylab = "predicted", xlab = "real")
 
 abline(0,1)
 
 # Calculate Root Mean Square Error (RMSE)
 RMSE.NN = (sum((x - predict_testNN)^2) / nrow(datatest)) ^ 0.5
-```
 
-```{r}
+# Calculate R-squared
 ydi<- x
 yi<- predict_testNN
  ym<-mean(x)
 R<-1- ((sum((yi-ydi)^2))/(sum((ydi-ym)^2)))
 ```
 
-
-next: try another hidden layer? currently with 2 hidden laters RMSE = 13.58, R squared  =.51852 
-also try doing loop though test sets ie k-fold cross validation
-
-
+## K-fold CV attempt
 ```{r}
 #k-fold
 set.seed(123) 
@@ -104,12 +90,9 @@ for(i in 1:10){
     #Use the test and train data partitions however you desire...
 }
 
-
-
-
 train.control <- trainControl(method = "cv", number = 10)
 # Train the model
-NN_k= neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , train.control, hidden = 3 , linear.output = T, stepmax = 1e7 )
+NN_k= neuralnet(Actual_Time ~ Age + Section_NN + Sex_NN , train.control, hidden = 2 , linear.output = T, stepmax = 1e7 )
 
 # Summarize the results
 print(model)
@@ -117,7 +100,6 @@ print(model)
 ```
 
 ###NN_Sex
-
 
 ```{r}
 # Random sampling
@@ -130,7 +112,7 @@ testNN = scaled[-index , ]
 
 # fit neural network
 set.seed(21)
-NN_sex = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 2 , linear.output = T, stepmax = 1e7 )
+NN_sex = neuralnet(Actual_Time ~ Age + Sex_NN , trainNN, hidden = 1 , linear.output = T, stepmax = 1e7 )
 
 # plot neural network
 plot(NN)
@@ -146,15 +128,14 @@ x<- ds_NN$Actual_Time[-index ]  #true data for tested
 xdata <- ds_NN[-index, ]
 test <- cbind(xdata, predict_testNN)
 
+# plot predicted against true 
 plot(x, predict_testNN, col='blue', pch=16, ylab = "predicted rating NN", xlab = "real rating")
-
 abline(0,1)
 
 # Calculate Root Mean Square Error (RMSE)
 RMSE.NN = (sum((x - as.vector(predict_testNN))^2) / length(x)) ^ 0.5
-```
 
-```{r}
+#Calculate R-squared 
 ydi<- x
 yi<- predict_testNN
  ym<-mean(x)

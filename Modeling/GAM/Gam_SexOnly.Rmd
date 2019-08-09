@@ -11,34 +11,45 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 Age2 <- rep(c(6:80), 2)
-Sex2_NN<- c(rep(0, 75), rep(1, 75))
-test2 <- data.frame( "Age" = Age2 , "Sex_NN" = Sex2_NN)
+Sex2<- c(rep("F", 75), rep("M", 75))
+test2 <- data.frame( "Age" = Age2 , "Sex" = Sex2)
 
 ```
 
 ###Boot Function - gets factors 
 ```{r}
-
-boot_gam_SexOnly<- function (data, testdata){
-  index = sample( seq_len ( nrow ( data) ), size = nrow( data ) ) 
+# bootstrap fn 
+boot_gam_SexOnly<- function (data, testdata, samplesize){
+  index = sample( seq_len ( nrow ( data ) ), size = samplesize )
   train = data[index , ]
-  model.nn <- train( Actual_Time ~ Age + Sex_NN,
-                  data = train,
-                  method = "gam",
-                  trace = FALSE,
-                  linout = T) # add linout = T next time 
+  #old model-- decided to not use train() bc overfiting 
+  #model <- train( Actual_Time ~ Age + Sex_NN,
+                 # data = train,
+                 # method = "gam",
+                 # trace = FALSE,
+                 # linout = T) # add linout = T next time
   
-  predictions <- predict( model.nn, testdata)
+  model <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + s(Age, k= 10, by = as.factor(Sex)), 
+               method  = 'REML' , 
+               data = train) 
   
+  # predict
+  predictions <- predict( model, testdata)
+  
+  # bind rescaled predicted values with all age, sex, and section combinations
   prediction_data <- cbind(testdata, predictions)  
 
+  # initialize objects for upcoming loop
   index <- 1
   base_years <- c(27, 30, 35)
   time_F_GAM <- c()
   time_M_GAM <- c()
-  female <- prediction_data %>% filter(Sex_NN == 0) 
-  male <- prediction_data %>% filter(Sex_NN == 1) 
   
+  # predicted times for females and males
+  female <- prediction_data %>% filter(Sex == "F") 
+  male <- prediction_data %>% filter(Sex == "M") 
+  
+  # finds prediction for ages 27, 30, 35 
   for (age in base_years){ #gets base times (27,30,35)
      time_F_GAM[index] <- unlist(female %>% 
                                filter(Age == age) %>% 
@@ -49,16 +60,14 @@ boot_gam_SexOnly<- function (data, testdata){
     index <- index + 1
   }
   
-F_time <- unlist(female %>% select(predictions)) # times for females all ages 
-M_time <- unlist(male %>% select(predictions))
+  # find predictions for each combination (both sexes)
+  F_time <- unlist(female %>% select(predictions)) 
+  M_time <- unlist(male %>% select(predictions))
 
-
-#factor27_F_NN = femaleNN/time_F_NN[1] #;
-#factor27_M_NN = maleNN/time_M_NN[1] 
-out$factor30_F = F_time/time_F_GAM[2]
-out$factor30_M = M_time/time_M_GAM[2]#times divided by time at age 30 
-
-#factor35_F = female/time_F[3] ; factor35_M = male/time_F[3]
+  # finds factors by dividing predicted times by predicted base times   (27, 30, 35)
+  out$factor30_F = F_time/time_F_GAM[2]#times divided by time at age 30 
+  out$factor30_M = M_time/time_M_GAM[2]
+#divide by time_F_GAM[1] and time_F_GAM[3] for age 27 and 35 respectively
 
   return( out )
 }
@@ -67,10 +76,12 @@ out$factor30_M = M_time/time_M_GAM[2]#times divided by time at age 30
 ##Bootstrap and tidy output 
 ```{r}
 out <- list()
-out <- do(1000)* boot_gam_SexOnly(data = ds_NN, 
-                           testdata = test2) 
+B <- 10 # number of bootstrap samples 
+output30_GAMsex <- do(B)* boot_gam_SexOnly(data = ds, 
+                           testdata = test2, 
+                           samplesize = 0.85 * nrow(ds)) 
 
-factors30_GAM_SexOnly <- lapply(out, function(x){  
+factors30_GAM_SexOnly <- lapply(output30_GAMsex, function(x){  
   as.data.frame(sapply(x,rbind))
   })
 ```
@@ -80,7 +91,7 @@ factors30_GAM_SexOnly <- lapply(out, function(x){
 ```{r}
 factors30_CI_GAMSexOnly<- lapply(factors30_GAM_SexOnly, function(x){
   apply(x, 1, function(x){
-    c(Mean = mean(x), lb = quantile(x, .05), ub = quantile(x, .95))
+    c(Mean = mean(x), lb = quantile(x, .025), ub = quantile(x, .975))
     })
 })
 factors30_CI_GAMSexOnly<- lapply(factors30_CI_GAMSexOnly, 
@@ -132,3 +143,18 @@ SexGAM.plot
 SexSectionGAM.plot
 grid.arrange(SexGAM.plot, SexSectionGAM.plot, ncol = 2)
 ```
+
+
+##Dataframe
+
+```{r}
+df30_F_gam <- cbind(df30_F_gam, "Sex" = rep("Female", nrow(df30_F_gam)))
+df30_M_gam <- cbind(df30_M_gam, "Sex" = rep("Male", nrow(df30_M_gam)))
+# bind - df of 150 rows 
+factors30_SexGAMdf <- rbind.data.frame(df30_F_gam, df30_M_gam)
+
+# once satified - output through csv 
+write.csv(factors30_SexGAMdf, "GAM30_Sex", row.names = F)
+write.csv(factors30_SexSectionGAMdf, "GAM30_SexSection", row.names = F)
+```
+

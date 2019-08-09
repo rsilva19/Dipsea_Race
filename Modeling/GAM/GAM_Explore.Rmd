@@ -18,48 +18,21 @@ library("mgcv") # for gam()
 
 ## "GAM" : for sex and section
 ```{r}
-#want to keep Sex and Section sep. ie do not need Sex_Section var
-set.seed(34)
+set.seed(34) # after training model, will not change if set seed
+
+#train
 GAM <- mgcv::gam(Actual_Time ~ s(Age, k= 40) + Sex + Section + s(Age, k= 60, by = as.factor(Sex)) + s(Age, k= 60, by = as.factor(Section)) , data = ds)  #.503
 
 plot(GAM, se = T)
-summary(GAM) 
+summary(GAM) # model output 
 
+#check edf
 mgcv::gam.check(GAM)
-
 
 #test if sex interaction needed with anova
 GAM_minus <- mgcv::gam(Actual_Time ~ s(Age, k= 40) + Sex + Section + s(Age, k= 60, by = as.factor(Section)) , data = ds) 
 
-anova(GAM_minus, GAM, test = "F") #yes, needed
-```
-
-
-###Model for just sex 
-```{r}
-
-###### train to find RMSE 
-samplesize = 0.70 * nrow(ds_NN)
-index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
-
-# Create training and test set
-datatrain = ds[ index, ]
-datatest = ds[ -index, ]
-
-set.seed(35)
-gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 40) + s(Age, by = as.factor(Sex), k = 60) + Sex, data = datatrain) 
-summary(gam_sex)
-plot(gam_sex, se = T)
-mgcv::gam.check(gam_sex)
-
-###predict 
-
-pred <- predict(gam_sex, datatest)
-
-
-y <- ds$Actual_Time[-index ]  #true data for tested
-
-RMSE.GAM <- (sum((y - pred)^2) / nrow(datatest)) ^ 0.5 #16.5
+anova(GAM_minus, GAM, test = "F") #yes, interaction needed
 ```
 
 # Over fitting? Try smaller k. 
@@ -75,10 +48,10 @@ summary(GAM)
 mgcv::gam.check(GAM)
 ```
 
-To make sure our model is not overfitting, we want to look at the variation in prediction between a few of the same model. 
+To make sure our model is not overfitting, we want to look at the variation in prediction between using the same model. 
 
 ```{r}
-GAM <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+
 
 # create test data 
 Age <- rep(c(6:80), 4)
@@ -88,16 +61,22 @@ SectionGAM<- c(rep("Invitational", 75),
 testGAM2 <- data.frame( Age , "Sex" = SexGAM, "Section" = SectionGAM)
 testdata = testGAM2
 
-# predict on test
-GAM1 <- GAM
+
+# train model 1
 set.seed(1)
 GAM1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+# predict on test
 pred1 <- predict( GAM1, testdata )
+
+# train model 2
 set.seed(2)
 GAM2 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+# predict
 pred2 <- predict( GAM2, testdata )
 
+# model 3
 GAM3 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+# predict
 pred3 <- predict( GAM3, testdata )
 
 # look at variation
@@ -110,24 +89,26 @@ summary(GAM1); summary(GAM2); summary(GAM3)
 # Even smaller k? 
 Possible problem with even smaller k: gam.check() says that 'k-index' <1 may indicate k is too small. However it says, "especially when edf is close to k" which is not the typical case here (below). 
 ```{r}
-GAM <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+# create 3 new models and predict on test (repeat process above with smaller k)
+GAM1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
 
 gam.check(GAM)
-
-# create 3 new models and predict on test
-GAM1 <- GAM
+# predict
 pred1 <- predict(GAM1, testdata)
 
+# model 2
 set.seed(10)
 GAM2 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
-pred2 <- predict( GAM2, testdata )
+pred2 <- predict( GAM2, testdata ) # predict 
+
+# model 3
 set.seed(3)
 GAM3 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
 summary(GAM3)
-pred3 <- predict( GAM3, testdata )
+pred3 <- predict( GAM3, testdata ) # predict
 
 # look at variation
-pred_data2 <- cbind(testdata, pred1, pred2, pred3) # better variation 
+pred_data2 <- cbind(testdata, pred1, pred2, pred3) # no variation 
 ```
 
 Try sampling data to avoid overfitting. 
@@ -137,10 +118,11 @@ index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
 train = ds[index , ]
 
 
-# create 3 new models and predict on test
+# create 2 new models and predict on test
 g1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = train) 
 pred1 <- predict(g1, testdata)
 
+# model 2
 index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
 train = ds[index , ]
 g2 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = train) 
@@ -151,5 +133,37 @@ pred2 <- predict( g2, testdata )
 pred_data2 <- cbind(testdata, pred1, pred2) # better variation 
 ```
 
+# Model for just sex 
+```{r}
 
+###### train to find RMSE 
+samplesize = 0.70 * nrow(ds_NN)
+index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
+
+# Create training and test set
+datatrain = ds[ index, ]
+datatest = ds[ -index, ]
+
+set.seed(35)
+gam_sex <- mgcv::gam(Actual_Time ~ s(Age, k = 10) + s(Age, by = as.factor(Sex), k = 10) + Sex, data = datatrain) 
+summary(gam_sex)
+plot(gam_sex, se = T)
+mgcv::gam.check(gam_sex)
+
+###predict 
+
+pred <- predict(gam_sex, datatest)
+
+
+y <- ds$Actual_Time[-index ]  #true data for tested
+
+RMSE.GAM <- (sum((y - pred)^2) / nrow(datatest)) ^ 0.5 #16.5
+
+
+# predict on simple data set 
+pred1 <- predict(gam_sex, test2) # test2 built in Gam_SexOnly
+
+gam_sex2 <- mgcv::gam(Actual_Time ~ s(Age, k = 10) + s(Age, by = as.factor(Sex), k = 10) + Sex, data = datatrain) 
+pred2 <- predict(gam_sex2, test2)
+```
 
