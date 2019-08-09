@@ -63,18 +63,23 @@ testdata = testGAM2
 
 
 # train model 1
-set.seed(1)
-GAM1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = ds) 
+# bootstrap data
+index = sample( seq_len ( nrow ( ds ) ), size = nrow(ds), replace = T )
+train = ds[index , ]
+GAM1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = train) 
 # predict on test
 pred1 <- predict( GAM1, testdata )
 
 # train model 2
-set.seed(2)
+index = sample( seq_len ( nrow ( ds ) ), size = nrow(ds), replace = T )
+train = ds[index , ]
 GAM2 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 20, by = as.factor(Sex)) + s(Age, k= 20, by = as.factor(Section)) , method  = 'REML' , data = ds) 
 # predict
 pred2 <- predict( GAM2, testdata )
 
 # model 3
+index = sample( seq_len ( nrow ( ds ) ), size = nrow(ds), replace = T )
+train = ds[index , ]
 GAM3 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = ds) 
 # predict
 pred3 <- predict( GAM3, testdata )
@@ -82,8 +87,6 @@ pred3 <- predict( GAM3, testdata )
 # look at variation
 pred_data <- cbind(testdata, pred1, pred2, pred3) 
 
-# no variation. 
-summary(GAM1); summary(GAM2); summary(GAM3)
 ```
 
 # Even smaller k? 
@@ -111,10 +114,10 @@ pred3 <- predict( GAM3, testdata ) # predict
 pred_data2 <- cbind(testdata, pred1, pred2, pred3) # no variation 
 ```
 
-Try sampling data to avoid overfitting. 
+Try sampling smaller set?  
 ```{r}
 samplesize = 0.85 * nrow(ds)
-index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
+index = sample( seq_len ( nrow ( ds ) ), size = nrow(ds), replace = T )
 train = ds[index , ]
 
 
@@ -123,7 +126,7 @@ g1 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by =
 pred1 <- predict(g1, testdata)
 
 # model 2
-index = sample( seq_len ( nrow ( ds ) ), size = samplesize )
+index = sample( seq_len ( nrow ( ds ) ), size = nrow(ds), replace = T )
 train = ds[index , ]
 g2 <- mgcv::gam(Actual_Time ~ s(Age, k= 10) + Sex + Section + s(Age, k= 10, by = as.factor(Sex)) + s(Age, k= 10, by = as.factor(Section)) , method  = 'REML' , data = train) 
 pred2 <- predict( g2, testdata )
